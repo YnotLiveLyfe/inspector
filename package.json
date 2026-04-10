@@ -20,7 +20,9 @@
   "workspaces": [
     "client",
     "server",
-    "cli"
+    "cli",
+    "packages/mcp-editor-metadata",
+    "examples/weather-server"
   ],
   "scripts": {
     "build": "npm run build-server && npm run build-client && npm run build-cli",
