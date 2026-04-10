@@ -28,6 +28,7 @@ import express from "express";
 import rateLimit from "express-rate-limit";
 import { findActualExecutable } from "spawn-rx";
 import mcpProxy from "./mcpProxy.js";
+import { registerMetadataRoutes } from "./routes/metadata.js";
 import { randomUUID, randomBytes, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -815,6 +816,8 @@ app.get(
     res.send(sandboxHtml);
   },
 );
+
+registerMetadataRoutes(app);
 
 const PORT = parseInt(
   process.env.SERVER_PORT || DEFAULT_MCP_PROXY_LISTEN_PORT,
