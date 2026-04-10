@@ -175,6 +175,7 @@ const updateHeadersInPlace = (
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 app.use((req, res, next) => {
   res.header("Access-Control-Expose-Headers", "mcp-session-id");
   next();
