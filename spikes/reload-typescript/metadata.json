@@ -1,0 +1,6 @@
+{
+  "echo": {
+    "title": "Echo Tool (initial)",
+    "description": "INITIAL description loaded from metadata.json at server startup."
+  }
+}
