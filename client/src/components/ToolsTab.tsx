@@ -273,6 +273,19 @@ const ToolsTab = ({
       });
   }, [metadataPath]);
 
+  // Keep selectedTool in sync with the tools array. When listTools() refreshes
+  // the array after a metadata save, the Tool object references change — but
+  // selectedTool still holds the old reference, so the detail pane would show
+  // stale data. The reference check prevents an infinite loop: after the
+  // update, selectedTool === updated, so the condition is false next render.
+  useEffect(() => {
+    if (!selectedTool) return;
+    const updated = tools.find((t) => t.name === selectedTool.name);
+    if (updated && updated !== selectedTool) {
+      setSelectedTool(updated);
+    }
+  }, [tools, selectedTool, setSelectedTool]);
+
   const hasReservedMetadataEntry = metadataEntries.some(({ key }) => {
     const trimmedKey = key.trim();
     return trimmedKey !== "" && isReservedMetaKey(trimmedKey);
