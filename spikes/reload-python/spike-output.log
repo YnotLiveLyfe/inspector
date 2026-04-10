@@ -1,0 +1,135 @@
+[spike-server-py] starting
+
+
++-----------------------------------------------------------------------------+
+|                                                                             |
+|                                                                             |
+|                        \u2584\u2580\u2580 \u2584\u2580\u2588 \u2588\u2580\u2580 \u2580\u2588\u2580 \u2588\u2580\u2584\u2580\u2588 \u2588\u2580\u2580 \u2588\u2580\u2588                        |
+|                        \u2588\u2580  \u2588\u2580\u2588 \u2584\u2584\u2588  \u2588  \u2588 \u2580 \u2588 \u2588\u2584\u2584 \u2588\u2580\u2580                        |
+|                                                                             |
+|                                                                             |
+|                                FastMCP 3.2.3                                |
+|                            https://gofastmcp.com                            |
+|                                                                             |
+|              \U0001f5a5  Server:      reload-spike-python-server, 3.2.3              |
+|              \U0001f680 Deploy free: https://horizon.prefect.io                     |
+|                                                                             |
++-----------------------------------------------------------------------------+
+
+
+[04/10/26 12:47:36] INFO     Starting MCP server               transport.py:209
+                             'reload-spike-python-server' with                 
+                             transport 'stdio'                                 
+
+
+==================== BASELINE ====================
+
+[baseline tools/list echo] {
+  "name": "echo",
+  "title": "Echo Tool (initial)",
+  "description": "INITIAL description loaded from metadata.json at server startup."
+}
+
+[baseline get_live_description] {"inMemoryDescription": "INITIAL description loaded from metadata.json at server startup."}
+
+
+==================== EXPERIMENT 1: mutate in-memory variable directly (no SDK call) ====================
+
+[mutate_variable result] Mutated in-memory metadata['echo']['description'] to: MUTATED description (variable only, no SDK call).
+
+[get_live_description after mutate] {"inMemoryDescription": "MUTATED description (variable only, no SDK call)."}
+
+[tools/list echo after mutate] {
+  "name": "echo",
+  "title": "Echo Tool (initial)",
+  "description": "INITIAL description loaded from metadata.json at server startup."
+}
+
+[conclusion] tools/list STILL shows the original description -> SDK captured description BY VALUE. Mutating the metadata dict does NOT affect the Tool object.
+
+
+==================== EXPERIMENT 2: assign echo_tool.description directly (Pydantic mutation) ====================
+
+[update_tool result] Assigned echo_tool.description = 'UPDATED via direct Pydantic attribute assignment.'; tools/list_changed notification sent
+
+[tools/list echo after update] {
+  "name": "echo",
+  "title": "Echo Tool (initial)",
+  "description": "UPDATED via direct Pydantic attribute assignment."
+}
+
+[conclusion] SUCCESS: tools/list reflects the new description.
+
+
+==================== EXPERIMENT 3: modify metadata.json on disk, then reload via reload_metadata ====================
+
+[disk] wrote C:\Users\ynot_desktop\OneDrive\Desktop\Brain\projects\mcp-editor\build\spikes\reload-python\metadata.json
+
+[tools/list echo after file rewrite (before reload call)] {
+  "name": "echo",
+  "title": "Echo Tool (initial)",
+  "description": "UPDATED via direct Pydantic attribute assignment."
+}
+
+[reload_metadata result] Reloaded from disk. Applied description: RELOADED from disk via file rewrite + direct Pydantic attribute assignment.; tools/list_changed notification sent
+
+[tools/list echo after reload] {
+  "name": "echo",
+  "title": "Echo Tool (from disk v2)",
+  "description": "RELOADED from disk via file rewrite + direct Pydantic attribute assignment."
+}
+
+[conclusion] SUCCESS: hot reload from disk works via direct attribute assignment.
+
+
+==================== EXPERIMENT 4: re-call mcp.add_tool('echo', ...) with same name ====================
+                    WARNING  Component already exists:    local_provider.py:192
+                             tool:echo@                                        
+
+[reregister_tool result] UNEXPECTED: re-registration succeeded
+
+[tools/list echo after re-register attempt] {
+  "name": "echo",
+  "title": "Echo Tool (re-registered)",
+  "description": "description from re-registration attempt"
+}
+
+[finding] FastMCP default on_duplicate='warn' -> add_tool() silently REPLACES the tool in LocalProvider._components and logs a warning. The OLD Tool instance is orphaned; any module-level handle the user code was holding is now stale.
+
+
+==================== EXPERIMENT 5: direct Pydantic mutation AFTER re-register (stale handle test) ====================
+
+[update_tool result (stale handle)] Assigned echo_tool.description = 'ATTEMPT to mutate stale handle after re-register.'; tools/list_changed notification sent
+
+[tools/list echo after stale update] {
+  "name": "echo",
+  "title": "Echo Tool (re-registered)",
+  "description": "description from re-registration attempt"
+}
+
+[finding] STALE HANDLE PROBLEM confirmed. tools/list shows the re-registered description, not the one we just tried to assign. Direct mutation only works on the Tool instance that's currently in _components.
+
+
+==================== EXPERIMENT 6: remove_tool + add_tool explicit rebind path ====================
+
+[remove_and_readd result] remove+add succeeded; tools/list_changed notification sent
+
+[tools/list echo after remove+add] {
+  "name": "echo",
+  "title": "Echo Tool (re-added)",
+  "description": "RE-ADDED via remove_tool + add_tool path."
+}
+
+[conclusion] SUCCESS: remove+add path also works; server rebinds echo_tool handle.
+
+
+==================== EXPERIMENT 7: sanity check of final state ====================
+
+[final tools/list echo] {
+  "name": "echo",
+  "title": "Echo Tool (re-added)",
+  "description": "RE-ADDED via remove_tool + add_tool path."
+}
+
+
+==================== ALL EXPERIMENTS COMPLETE ====================
