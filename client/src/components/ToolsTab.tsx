@@ -44,6 +44,8 @@ import { useToast } from "@/lib/hooks/useToast";
 import useCopy from "@/lib/hooks/useCopy";
 import IconDisplay, { WithIcons } from "./IconDisplay";
 import { cn } from "@/lib/utils";
+import { fetchMetadata, type MetadataFile } from "@/lib/metadataApi";
+import { ToolEditForm } from "@/components/editor/ToolEditForm";
 import {
   META_NAME_RULES_MESSAGE,
   META_PREFIX_RULES_MESSAGE,
@@ -210,6 +212,11 @@ const ToolsTab = ({
   const formRefs = useRef<Record<string, DynamicJsonFormRef | null>>({});
   const { toast } = useToast();
   const { copied, setCopied } = useCopy();
+  const [metadataPath, setMetadataPath] = useState("");
+  const [editingTool, setEditingTool] = useState<string | null>(null);
+  const [currentMetadata, setCurrentMetadata] = useState<MetadataFile | null>(
+    null,
+  );
 
   // Function to check if any form has validation errors
   const checkValidationErrors = (validateChildren: boolean = false) => {
@@ -253,6 +260,19 @@ const ToolsTab = ({
     formRefs.current = {};
   }, [selectedTool, serverSupportsTaskRequests]);
 
+  useEffect(() => {
+    if (!metadataPath) {
+      setCurrentMetadata(null);
+      return;
+    }
+    fetchMetadata(metadataPath)
+      .then(setCurrentMetadata)
+      .catch((err) => {
+        console.error("Failed to load metadata:", err);
+        setCurrentMetadata(null);
+      });
+  }, [metadataPath]);
+
   const hasReservedMetadataEntry = metadataEntries.some(({ key }) => {
     const trimmedKey = key.trim();
     return trimmedKey !== "" && isReservedMetaKey(trimmedKey);
@@ -274,6 +294,18 @@ const ToolsTab = ({
 
   return (
     <TabsContent value="tools">
+      <div className="flex items-center gap-2 p-2 border-b">
+        <label className="text-sm font-medium whitespace-nowrap">
+          Metadata path:
+        </label>
+        <input
+          className="flex-1 px-2 py-1 border rounded text-sm"
+          data-testid="metadata-path-input"
+          value={metadataPath}
+          onChange={(e) => setMetadataPath(e.target.value)}
+          placeholder="/abs/path/to/metadata.json"
+        />
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <ListPane
           items={tools}
@@ -331,9 +363,57 @@ const ToolsTab = ({
                     </AlertDescription>
                   </Alert>
                 )}
-                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap max-h-48 overflow-y-auto">
-                  {selectedTool.description}
-                </p>
+                {editingTool === selectedTool.name && currentMetadata ? (
+                  <ToolEditForm
+                    toolName={selectedTool.name}
+                    initialDescription={selectedTool.description ?? ""}
+                    currentMetadata={currentMetadata}
+                    metadataPath={metadataPath}
+                    onSaved={async () => {
+                      setEditingTool(null);
+                      // CRITICAL: reload must happen BEFORE listTools.
+                      // 1) Tell the running MCP server to re-read metadata.json from disk
+                      //    and call handle.update() on the tools whose descriptions changed.
+                      try {
+                        await callTool("_reload_metadata", {});
+                      } catch (err) {
+                        console.warn(
+                          "_reload_metadata failed — server may not support hot reload:",
+                          err,
+                        );
+                      }
+                      // 2) Re-fetch tools/list so the UI reflects the updated descriptions.
+                      await listTools();
+                      // 3) Re-fetch the metadata file for the next edit session.
+                      try {
+                        const refreshed = await fetchMetadata(metadataPath);
+                        setCurrentMetadata(refreshed);
+                      } catch (err) {
+                        console.error(
+                          "Failed to refresh metadata after save:",
+                          err,
+                        );
+                      }
+                    }}
+                    onCancel={() => setEditingTool(null)}
+                  />
+                ) : (
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                      {selectedTool.description}
+                    </p>
+                    {currentMetadata &&
+                      currentMetadata.tools[selectedTool.name] && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEditingTool(selectedTool.name)}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                  </div>
+                )}
                 <AnnotationBadges
                   annotations={
                     hasAnnotations(selectedTool)

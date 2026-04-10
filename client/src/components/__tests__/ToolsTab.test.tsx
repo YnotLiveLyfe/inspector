@@ -1013,7 +1013,12 @@ describe("ToolsTab", () => {
 
       // Should render textarea, not select
       expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-      expect(screen.getByRole("textbox")).toBeInTheDocument();
+      const toolTextboxes = screen
+        .getAllByRole("textbox")
+        .filter(
+          (el) => el.getAttribute("data-testid") !== "metadata-path-input",
+        );
+      expect(toolTextboxes.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -1037,6 +1042,14 @@ describe("ToolsTab", () => {
       },
     };
 
+    // Helper to get tool parameter textboxes, excluding the metadata path input
+    const getToolTextboxes = () =>
+      screen
+        .getAllByRole("textbox")
+        .filter(
+          (el) => el.getAttribute("data-testid") !== "metadata-path-input",
+        );
+
     it("should prevent tool execution when JSON validation fails", async () => {
       const mockCallTool = jest.fn();
       renderToolsTab({
@@ -1046,7 +1059,7 @@ describe("ToolsTab", () => {
       });
 
       // Find JSON editor textareas (there should be at least 1 for JSON parameters)
-      const textareas = screen.getAllByRole("textbox");
+      const textareas = getToolTextboxes();
       expect(textareas.length).toBeGreaterThanOrEqual(1);
 
       // Enter invalid JSON in the first textarea
@@ -1074,7 +1087,7 @@ describe("ToolsTab", () => {
       });
 
       // Find JSON editor textareas (should have one for each required field: config and data)
-      const textareas = screen.getAllByRole("textbox");
+      const textareas = getToolTextboxes();
       expect(textareas.length).toBe(2);
 
       // Enter valid JSON in each textarea
@@ -1108,7 +1121,7 @@ describe("ToolsTab", () => {
         callTool: mockCallTool,
       });
 
-      const textareas = screen.getAllByRole("textbox");
+      const textareas = getToolTextboxes();
 
       // Enter invalid JSON that contains both valid and invalid parts
       fireEvent.change(textareas[0], {
@@ -1149,7 +1162,7 @@ describe("ToolsTab", () => {
       });
 
       // Fill in the simple parameters
-      const messageInput = screen.getByRole("textbox");
+      const messageInput = getToolTextboxes()[0];
       const countInput = screen.getByRole("spinbutton");
 
       fireEvent.change(messageInput, { target: { value: "test message" } });
@@ -1181,7 +1194,7 @@ describe("ToolsTab", () => {
         callTool: mockCallTool,
       });
 
-      const textareas = screen.getAllByRole("textbox");
+      const textareas = getToolTextboxes();
       expect(textareas.length).toBe(2);
 
       // Clear both textareas (empty JSON should be valid)
