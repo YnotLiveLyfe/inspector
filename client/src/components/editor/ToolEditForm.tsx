@@ -8,7 +8,7 @@ interface ToolEditFormProps {
   initialDescription: string;
   currentMetadata: MetadataFile;
   metadataPath: string;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -39,7 +39,7 @@ export function ToolEditForm({
         },
       };
       await saveMetadata(metadataPath, updated);
-      onSaved();
+      await onSaved();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -49,8 +49,11 @@ export function ToolEditForm({
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium">Description</label>
+      <label htmlFor="tool-edit-description" className="text-sm font-medium">
+        Description
+      </label>
       <Textarea
+        id="tool-edit-description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         rows={5}

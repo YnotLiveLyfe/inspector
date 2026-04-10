@@ -295,10 +295,14 @@ const ToolsTab = ({
   return (
     <TabsContent value="tools">
       <div className="flex items-center gap-2 p-2 border-b">
-        <label className="text-sm font-medium whitespace-nowrap">
+        <label
+          htmlFor="metadata-path"
+          className="text-sm font-medium whitespace-nowrap"
+        >
           Metadata path:
         </label>
         <input
+          id="metadata-path"
           className="flex-1 px-2 py-1 border rounded text-sm"
           data-testid="metadata-path-input"
           value={metadataPath}
