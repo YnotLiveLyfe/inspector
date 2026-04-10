@@ -9,6 +9,7 @@ client/tsconfig.app.tsbuildinfo
 client/tsconfig.node.tsbuildinfo
 cli/build
 packages/mcp-editor-metadata/dist
+examples/weather-server/dist
 test-output
 tool-test-output
 metadata-test-output
