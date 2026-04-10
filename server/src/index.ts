@@ -175,7 +175,10 @@ const updateHeadersInPlace = (
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Scoped to /api/* only — the MCP proxy routes (/mcp, /stdio, /sse, /message)
+// must read the raw request stream themselves, so mounting body parsing
+// globally breaks them with "stream is not readable" (verified empirically).
+app.use("/api", express.json());
 app.use((req, res, next) => {
   res.header("Access-Control-Expose-Headers", "mcp-session-id");
   next();
