@@ -37,7 +37,7 @@ async function main() {
           { type: "text", text: `Weather in ${city}: 72°F, sunny (mock)` },
         ],
       }),
-    ) as ToolHandle,
+    ),
   );
 
   handles.set(
@@ -61,7 +61,7 @@ async function main() {
           content: [{ type: "text", text: `${result.toFixed(1)}°${to}` }],
         };
       },
-    ) as ToolHandle,
+    ),
   );
 
   // Register the admin reload tool. The MCP Editor calls this tool (via the

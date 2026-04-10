@@ -3,9 +3,13 @@ import type { MetadataFile, ToolMetadata } from "./schema.js";
 /**
  * A handle that looks like the TS SDK's RegisteredTool — enough surface
  * to call update(). Kept structural so tests can pass plain mocks.
+ *
+ * `description` is optional to match the SDK's `RegisteredTool` type,
+ * so consumers can pass the return of `server.registerTool(...)` directly
+ * into a `Map<string, ToolHandle>` without a cast.
  */
 export interface ToolHandle {
-  description: string;
+  description?: string;
   update(updates: { description?: string; title?: string }): void;
 }
 
