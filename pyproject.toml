@@ -1,2 +1,4 @@
 [tool.uv.workspace]
-members = []
+members = [
+    "packages-py/mcp-editor-metadata",
+]
