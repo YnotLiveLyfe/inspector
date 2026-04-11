@@ -36,7 +36,7 @@ import {
   Copy,
   CheckCheck,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import ListPane from "./ListPane";
 import JsonView from "./JsonView";
 import ToolResults from "./ToolResults";
@@ -45,7 +45,9 @@ import useCopy from "@/lib/hooks/useCopy";
 import IconDisplay, { WithIcons } from "./IconDisplay";
 import { cn } from "@/lib/utils";
 import { fetchMetadata, type MetadataFile } from "@/lib/metadataApi";
+import { computeWarnings, type Warning } from "@/lib/metadataWarnings";
 import { ToolEditForm } from "@/components/editor/ToolEditForm";
+import { WarningBadge } from "@/components/editor/WarningBadge";
 import {
   META_NAME_RULES_MESSAGE,
   META_PREFIX_RULES_MESSAGE,
@@ -218,6 +220,27 @@ const ToolsTab = ({
     null,
   );
 
+  // -- Phase 2b: sidebar-level warnings derived from tools + metadata --------
+  const warnings = useMemo<Warning[]>(
+    () => computeWarnings(tools, currentMetadata, null),
+    [tools, currentMetadata],
+  );
+
+  const warningsByTool = useMemo(() => {
+    const by: Record<string, Warning[]> = {};
+    for (const w of warnings) {
+      (by[w.toolName] ??= []).push(w);
+    }
+    return by;
+  }, [warnings]);
+
+  const totalErrorCount = useMemo(
+    () => warnings.filter((w) => w.severity === "error").length,
+    [warnings],
+  );
+  const totalAdvisoryCount = warnings.length - totalErrorCount;
+  // --------------------------------------------------------------------------
+
   // Function to check if any form has validation errors
   const checkValidationErrors = (validateChildren: boolean = false) => {
     const errors = Object.values(formRefs.current).some(
@@ -323,6 +346,25 @@ const ToolsTab = ({
           placeholder="/abs/path/to/metadata.json"
         />
       </div>
+      {warnings.length > 0 && (
+        <div
+          className="flex items-center gap-3 px-2 py-1 text-xs border-b"
+          aria-label="Description warning summary"
+        >
+          <span className="font-medium">Description quality:</span>
+          {totalErrorCount > 0 && (
+            <span className="text-red-600 dark:text-red-400">
+              ⚠ {totalErrorCount} error{totalErrorCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {totalAdvisoryCount > 0 && (
+            <span className="text-amber-600 dark:text-amber-400">
+              ⚠ {totalAdvisoryCount} suggestion
+              {totalAdvisoryCount === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <ListPane
           items={tools}
@@ -344,6 +386,7 @@ const ToolsTab = ({
                   {tool.description}
                 </span>
               </div>
+              <WarningBadge warnings={warningsByTool[tool.name] ?? []} />
               <ChevronRight className="w-4 h-4 flex-shrink-0 text-gray-400 mt-1" />
             </div>
           )}
