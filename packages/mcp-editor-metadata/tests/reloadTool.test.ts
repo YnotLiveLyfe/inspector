@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { writeFileSync, mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { z } from "zod";
 import { registerReloadTool } from "../src/reloadTool.js";
 import type { ToolHandle } from "../src/registry.js";
 
@@ -94,5 +95,63 @@ describe("registerReloadTool", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toMatch(/parse|invalid|failed/i);
+  });
+
+  it("rebuilds paramsSchema via baseShapes when metadata has parameters (Phase 2a F3 coverage)", async () => {
+    // Phase 2a added `rebuildParamsSchema` and threaded `baseShapes` through
+    // `registerReloadTool`, but the existing tests all passed an empty
+    // Map() as baseShapes, so the "with actual base shapes" path was never
+    // exercised end-to-end. This test closes that gap.
+    const server = makeServerShim();
+    const echo = makeHandle("original");
+    const handles = new Map<string, ToolHandle>([["echo", echo]]);
+    const baseShapes = new Map<string, Record<string, z.ZodTypeAny>>([
+      ["echo", { city: z.string() }],
+    ]);
+
+    registerReloadTool(server as any, metaPath, handles, baseShapes);
+
+    // Write metadata that includes a parameter description override
+    writeFileSync(
+      metaPath,
+      JSON.stringify({
+        version: 1,
+        tools: {
+          echo: {
+            description: "Echo a message",
+            parameters: {
+              city: {
+                description: "City name such as Minneapolis.",
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const result = (await server.registered[0].handler()) as any;
+
+    // update() should have been called with BOTH description and paramsSchema
+    // when baseShapes carries an entry for the tool and metadata supplies
+    // parameters.
+    const updateCalls = (echo.update as unknown as ReturnType<typeof vi.fn>).mock
+      .calls as Array<[unknown]>;
+    const paramsSchemaCall = updateCalls.find(
+      (call) => typeof call[0] === "object" && call[0] !== null && "paramsSchema" in (call[0] as Record<string, unknown>),
+    );
+    expect(paramsSchemaCall).toBeDefined();
+
+    const paramsSchema = (paramsSchemaCall![0] as { paramsSchema: Record<string, z.ZodTypeAny> })
+      .paramsSchema;
+    expect(paramsSchema).toHaveProperty("city");
+    // The rebuilt Zod string should carry the description from metadata
+    // via `.describe()`, which Zod stores on `_def.description`.
+    const cityZod = paramsSchema.city as z.ZodString;
+    expect(
+      (cityZod._def as { description?: string }).description,
+    ).toBe("City name such as Minneapolis.");
+
+    // Result payload still indicates echo was updated
+    expect(result.content[0].text).toMatch(/echo/);
   });
 });
