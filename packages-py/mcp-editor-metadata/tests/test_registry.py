@@ -2,18 +2,27 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Any
 
-from mcp_editor_metadata.registry import apply_metadata
+from mcp_editor_metadata.registry import apply_metadata, ToolHandle
 from mcp_editor_metadata.schema import MetadataFile
 
 
 @dataclass
 class FakeHandle:
-    """Minimal object satisfying the ToolHandle protocol for tests."""
+    """Minimal object satisfying the ToolHandle protocol for tests.
+
+    Phase 2a: parameters field added to match the extended Protocol. Defaults
+    to an empty-properties object schema so existing Phase 1.5 tests that
+    don't exercise parameters can still instantiate FakeHandle() without args.
+    """
 
     description: str | None = None
     title: str | None = None
+    parameters: dict[str, Any] = field(
+        default_factory=lambda: {"type": "object", "properties": {}}
+    )
 
 
 def _build_metadata(tools: dict[str, dict]) -> MetadataFile:
@@ -152,3 +161,117 @@ class TestPatchParametersJsonSchema:
         result = patch_parameters_json_schema(base, {"other": "new"})
         # `city` was NOT in descriptions; its original description survives.
         assert result["properties"]["city"]["description"] == "original"
+
+
+# New in Phase 2a Task 7: tests for apply_metadata patching parameters.
+# Uses the shared FakeHandle from Step 1 (already has a parameters field now).
+
+
+class TestApplyMetadataWithParameters:
+    def test_patches_parameters_when_metadata_has_them(self) -> None:
+        handle = FakeHandle(
+            description="old",
+            parameters={
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+        )
+        handles: dict[str, ToolHandle] = {"get_weather": handle}
+        metadata = MetadataFile.model_validate(
+            {
+                "version": 1,
+                "tools": {
+                    "get_weather": {
+                        "description": "new",
+                        "parameters": {
+                            "city": {"description": "City name"}
+                        },
+                    }
+                },
+            }
+        )
+
+        result = apply_metadata(handles, metadata)
+
+        assert result.updated == ["get_weather"]
+        assert handle.description == "new"
+        assert (
+            handle.parameters["properties"]["city"]["description"]
+            == "City name"
+        )
+
+    def test_leaves_parameters_untouched_when_metadata_has_no_parameters(
+        self,
+    ) -> None:
+        handle = FakeHandle(
+            description="old",
+            parameters={
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+            },
+        )
+        original_params = copy.deepcopy(handle.parameters)
+        handles: dict[str, ToolHandle] = {"get_weather": handle}
+        metadata = MetadataFile.model_validate(
+            {
+                "version": 1,
+                "tools": {"get_weather": {"description": "new"}},
+            }
+        )
+
+        result = apply_metadata(handles, metadata)
+
+        assert result.updated == ["get_weather"]
+        assert handle.description == "new"
+        assert handle.parameters == original_params
+
+    def test_skipped_logic_respects_parameter_changes(self) -> None:
+        # Same description AND no parameters block → skipped.
+        handle = FakeHandle(
+            description="same",
+            parameters={"type": "object", "properties": {"x": {}}},
+        )
+        handles: dict[str, ToolHandle] = {"t": handle}
+        metadata = MetadataFile.model_validate(
+            {"version": 1, "tools": {"t": {"description": "same"}}}
+        )
+        result = apply_metadata(handles, metadata)
+        assert result.skipped == ["t"]
+        assert result.updated == []
+
+    def test_parameters_block_forces_update_even_if_description_matches(
+        self,
+    ) -> None:
+        # Same description BUT parameters block is present → always apply.
+        handle = FakeHandle(
+            description="same",
+            parameters={"type": "object", "properties": {"x": {}}},
+        )
+        handles: dict[str, ToolHandle] = {"t": handle}
+        metadata = MetadataFile.model_validate(
+            {
+                "version": 1,
+                "tools": {
+                    "t": {
+                        "description": "same",
+                        "parameters": {"x": {"description": "new x"}},
+                    }
+                },
+            }
+        )
+        result = apply_metadata(handles, metadata)
+        assert result.updated == ["t"]
+        assert handle.parameters["properties"]["x"]["description"] == "new x"
+
+    def test_missing_handle_still_reported(self) -> None:
+        handles: dict[str, ToolHandle] = {}
+        metadata = MetadataFile.model_validate(
+            {
+                "version": 1,
+                "tools": {"ghost": {"description": "gone"}},
+            }
+        )
+        result = apply_metadata(handles, metadata)
+        assert result.missing == ["ghost"]
+        assert result.updated == []

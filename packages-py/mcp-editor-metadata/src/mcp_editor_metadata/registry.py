@@ -12,15 +12,21 @@ from .schema import MetadataFile
 @runtime_checkable
 class ToolHandle(Protocol):
     """
-    Structural protocol for any object with mutable description/title attributes.
+    Structural protocol for any object with mutable description/title/parameters.
 
-    FastMCP's FunctionTool satisfies this naturally because its description and
-    title are Pydantic attributes on a non-frozen model. Tests can use dataclasses
-    or SimpleNamespace to satisfy it without importing FastMCP.
+    FastMCP's FunctionTool satisfies this naturally because its description,
+    title, and parameters are Pydantic attributes on a non-frozen model. Tests
+    can use dataclasses to satisfy it without importing FastMCP.
+
+    Phase 2a: `parameters` is added. It holds a JSON Schema dict (same shape
+    FastMCP serializes into `tools/list`). apply_metadata patches description
+    fields on entries in `parameters['properties']` when the metadata file
+    includes a parameters block.
     """
 
     description: str | None
     title: str | None
+    parameters: dict[str, Any]
 
 
 @dataclass
@@ -74,10 +80,16 @@ def apply_metadata(
     Apply a metadata file to a dict of tool handles.
 
     For each tool in ``metadata.tools``:
-      - If the handle's description and title already match, record as skipped.
       - If the handle is missing from ``handles``, record as missing.
+      - If description and title match AND there is no parameters block,
+        record as skipped.
       - Otherwise mutate the handle via direct attribute assignment and record
-        as updated.
+        as updated. When a parameters block is present, the handle's
+        ``parameters`` JSON Schema is patched via
+        ``patch_parameters_json_schema`` and assigned back.
+
+    Presence of a parameters block ALWAYS forces an apply. Comparing rebuilt
+    JSON Schema dicts is nontrivial and re-applying is idempotent.
 
     The caller is responsible for sending ``tools/list_changed`` via the
     FastMCP Context after this returns (the notification is not automatic in
@@ -91,16 +103,31 @@ def apply_metadata(
             result.missing.append(tool_name)
             continue
 
+        has_parameters = (
+            tool_meta.parameters is not None and len(tool_meta.parameters) > 0
+        )
+
         description_matches = handle.description == tool_meta.description
         no_title_update = tool_meta.title is None
 
-        if description_matches and no_title_update:
+        if description_matches and no_title_update and not has_parameters:
             result.skipped.append(tool_name)
             continue
 
         handle.description = tool_meta.description
         if tool_meta.title is not None:
             handle.title = tool_meta.title
+
+        if has_parameters:
+            assert tool_meta.parameters is not None  # narrowed by has_parameters
+            descriptions = {
+                name: pm.description
+                for name, pm in tool_meta.parameters.items()
+            }
+            handle.parameters = patch_parameters_json_schema(
+                handle.parameters, descriptions
+            )
+
         result.updated.append(tool_name)
 
     return result
