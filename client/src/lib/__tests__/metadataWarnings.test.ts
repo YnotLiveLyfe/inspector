@@ -13,6 +13,8 @@ import {
   type WarningKind,
 } from "../metadataWarnings";
 import { computeWarnings } from "../metadataWarnings";
+import { isBlockingInContext } from "../metadataWarnings";
+import type { MetadataFile } from "../metadataApi";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 describe("normalize", () => {
@@ -549,5 +551,88 @@ describe("computeWarnings — exotic schema handling", () => {
     } as Tool;
     expect(() => computeWarnings([tool], null)).not.toThrow();
     expect(computeWarnings([tool], null)).toEqual([]);
+  });
+});
+
+const errMissingTool: Warning = {
+  toolName: "get_weather",
+  kind: "missing-tool-description",
+  severity: "error",
+  message: "Tool has no description.",
+};
+
+const errMissingParam: Warning = {
+  toolName: "get_weather",
+  paramName: "city",
+  kind: "missing-param-description",
+  severity: "error",
+  message: "Param has no description.",
+};
+
+const advShort: Warning = {
+  toolName: "get_weather",
+  kind: "short-tool-description",
+  severity: "advisory",
+  message: "Too short.",
+};
+
+describe("isBlockingInContext", () => {
+  it("returns true for missing-tool-description regardless of metadata", () => {
+    expect(isBlockingInContext(errMissingTool, null)).toBe(true);
+    expect(
+      isBlockingInContext(errMissingTool, {
+        version: 1,
+        tools: {},
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true for missing-param-description when metadata is null", () => {
+    expect(isBlockingInContext(errMissingParam, null)).toBe(true);
+  });
+
+  it("returns true for missing-param-description when no current override exists", () => {
+    const metadata: MetadataFile = {
+      version: 1,
+      tools: {
+        get_weather: { description: "ok" },
+      },
+    };
+    expect(isBlockingInContext(errMissingParam, metadata)).toBe(true);
+  });
+
+  it("returns false for missing-param-description when a non-empty override exists", () => {
+    const metadata: MetadataFile = {
+      version: 1,
+      tools: {
+        get_weather: {
+          description: "ok",
+          parameters: {
+            city: { description: "Some existing city override" },
+          },
+        },
+      },
+    };
+    expect(isBlockingInContext(errMissingParam, metadata)).toBe(false);
+  });
+
+  it("returns true for missing-param-description when override exists but is empty (defensive)", () => {
+    // Shouldn't happen because ToolEditForm's save strips empties, but be defensive.
+    const metadata: MetadataFile = {
+      version: 1,
+      tools: {
+        get_weather: {
+          description: "ok",
+          parameters: {
+            city: { description: "" },
+          },
+        },
+      },
+    };
+    expect(isBlockingInContext(errMissingParam, metadata)).toBe(true);
+  });
+
+  it("returns false for advisory warnings regardless of metadata", () => {
+    expect(isBlockingInContext(advShort, null)).toBe(false);
   });
 });

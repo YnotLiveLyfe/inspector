@@ -370,3 +370,36 @@ export function computeWarnings(
 
   return warnings;
 }
+
+// -----------------------------------------------------------------------------
+// Blocking-context helper
+// -----------------------------------------------------------------------------
+
+/**
+ * Decide whether a warning should block the Save button in ToolEditForm.
+ *
+ * All advisory warnings are non-blocking. Most error warnings are blocking.
+ * The one exception: a `missing-param-description` warning is NOT blocking
+ * when the current saved metadata has a non-empty override for that exact
+ * tool+param. In that case, the user is clearing an existing override, and
+ * we don't know whether the source-code docstring (which will become the
+ * effective value after save+reload) is empty or not. See the spec's
+ * "Accepted false positive: clearing a param override" section.
+ */
+export function isBlockingInContext(
+  warning: Warning,
+  metadata: MetadataFile | null,
+): boolean {
+  if (warning.severity !== "error") return false;
+
+  if (warning.kind !== "missing-param-description") return true;
+  // It IS missing-param-description. Check for override downgrade.
+  if (!metadata || !warning.paramName) return true;
+
+  const override =
+    metadata.tools[warning.toolName]?.parameters?.[warning.paramName]
+      ?.description ?? "";
+  // A non-empty override means the user is clearing something that existed.
+  // Don't block; trust them.
+  return override.trim().length === 0;
+}
