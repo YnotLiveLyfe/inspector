@@ -1,0 +1,5 @@
+[tool.uv.workspace]
+members = []
+
+[tool.uv]
+python = "3.12"
