@@ -23,8 +23,9 @@ def register_reload_tool(
 ) -> None:
     """
     Register an administrative MCP tool that re-reads metadata.json from disk
-    and applies any description/title changes via direct Pydantic attribute
-    assignment, then fires tools/list_changed so clients refresh.
+    and applies any description, title, or parameter-description changes via
+    direct Pydantic attribute assignment, then fires tools/list_changed so
+    clients refresh.
 
     The MCP Editor frontend invokes this tool after writing a new metadata.json.
     """
@@ -35,8 +36,9 @@ def register_reload_tool(
         title="Reload metadata from disk",
         description=(
             "Administrative tool used by the MCP Editor. Re-reads the server's "
-            "metadata.json file and applies any description/title changes to "
-            "registered tools. Not intended for direct use by end users."
+            "metadata.json file and applies any description, title, or "
+            "parameter-description changes to registered tools. Not intended "
+            "for direct use by end users."
         ),
     )
     async def _reload(ctx: Context) -> str:
