@@ -7,9 +7,7 @@
  * See `projects/mcp-editor/files/spec-phase2b-warnings.md` for the full design.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { MetadataFile } from "./metadataApi";
 
 // -----------------------------------------------------------------------------
@@ -303,6 +301,71 @@ export function checkParamDescription(
       severity: "advisory",
       message: `Parameter '${paramName}' description uses only generic words.`,
     });
+  }
+
+  return warnings;
+}
+
+// -----------------------------------------------------------------------------
+// Entry point — computeWarnings
+// -----------------------------------------------------------------------------
+
+/**
+ * Compute all warnings for the given tool list, considering in-progress draft
+ * edits from ToolEditForm.
+ *
+ * The `metadata` parameter is currently unused inside this function because
+ * Phase 2a merges metadata overrides server-side before returning tool objects
+ * from `listTools()`. It is accepted for future-proofing (CLI consumers, tests
+ * that pass metadata directly) and for symmetry with `isBlockingInContext`.
+ *
+ * Effective-value resolution:
+ *   tool description  = draft?.description ?? tool.description ?? ""
+ *   param description = draft?.parameters[p] ?? property.description ?? ""
+ */
+export function computeWarnings(
+  tools: Tool[],
+  metadata: MetadataFile | null,
+  draft?: Draft | null,
+): Warning[] {
+  // metadata is accepted but not consulted — see docstring
+  void metadata;
+
+  const warnings: Warning[] = [];
+
+  for (const tool of tools) {
+    // Resolve effective tool description
+    const effectiveDesc =
+      draft?.toolName === tool.name
+        ? draft.description
+        : (tool.description ?? "");
+
+    warnings.push(...checkToolDescription(tool.name, effectiveDesc));
+
+    // Param checks
+    const properties = (tool.inputSchema?.properties ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    for (const paramName of Object.keys(properties)) {
+      const propSchema = properties[paramName];
+      // Skip boolean shorthand schemas (JSON Schema allows { property: true }).
+      // $ref shorthand is still an object and falls through — we read its
+      // .description (usually undefined) and let missing-param-description fire
+      // if applicable. This matches Phase 2a's ToolEditForm behavior.
+      if (typeof propSchema !== "object" || propSchema === null) continue;
+
+      const serverEffective =
+        (propSchema as { description?: string }).description ?? "";
+      const draftParamDesc =
+        draft?.toolName === tool.name ? draft.parameters[paramName] : undefined;
+      const effectiveParamDesc = draftParamDesc ?? serverEffective;
+
+      warnings.push(
+        ...checkParamDescription(tool.name, paramName, effectiveParamDesc),
+      );
+    }
   }
 
   return warnings;

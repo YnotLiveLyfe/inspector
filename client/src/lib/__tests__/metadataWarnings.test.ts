@@ -12,6 +12,8 @@ import {
   type WarningSeverity,
   type WarningKind,
 } from "../metadataWarnings";
+import { computeWarnings } from "../metadataWarnings";
+import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 describe("normalize", () => {
   it("lowercases, strips punctuation, collapses whitespace, and trims", () => {
@@ -351,5 +353,201 @@ describe("checkParamDescription — co-firing", () => {
     expect(kinds).toContain("stopwords-param-description");
     expect(kinds).not.toContain("missing-param-description");
     expect(kinds).not.toContain("short-param-description");
+  });
+});
+
+function makeTool(
+  name: string,
+  description: string,
+  properties: Record<string, { description?: string } | true> = {},
+): Tool {
+  return {
+    name,
+    description,
+    inputSchema: {
+      type: "object",
+      properties: properties as Record<string, unknown>,
+    },
+  } as Tool;
+}
+
+describe("computeWarnings — empty inputs", () => {
+  it("returns [] for empty tools", () => {
+    expect(computeWarnings([], null)).toEqual([]);
+  });
+
+  it("returns [] for tools with fully-valid descriptions", () => {
+    const tools = [
+      makeTool(
+        "get_weather",
+        "Get current weather and 5-day forecast for a given city. Use when the user mentions weather.",
+        {
+          city: { description: "City name such as 'Minneapolis' or 'Tokyo'." },
+        },
+      ),
+    ];
+    expect(computeWarnings(tools, null)).toEqual([]);
+  });
+});
+
+describe("computeWarnings — metadata null", () => {
+  it("uses tool.description from listTools when metadata is null", () => {
+    const tools = [makeTool("get_weather", "")];
+    const warnings = computeWarnings(tools, null);
+    expect(warnings.map((w) => w.kind)).toContain("missing-tool-description");
+  });
+});
+
+describe("computeWarnings — draft shadowing", () => {
+  it("uses draft.description for the tool being edited", () => {
+    const tools = [
+      makeTool(
+        "get_weather",
+        "A fully adequate description that is long enough",
+      ),
+    ];
+    const draft = {
+      toolName: "get_weather",
+      description: "",
+      parameters: {},
+    };
+    const warnings = computeWarnings(tools, null, draft);
+    expect(warnings.map((w) => w.kind)).toContain("missing-tool-description");
+  });
+
+  it("does NOT use draft for a different tool", () => {
+    const tools = [
+      makeTool(
+        "get_weather",
+        "A fully adequate description that is long enough",
+      ),
+      makeTool("convert_temperature", ""),
+    ];
+    const draft = {
+      toolName: "get_weather",
+      description: "",
+      parameters: {},
+    };
+    const warnings = computeWarnings(tools, null, draft);
+    // get_weather uses draft and hits missing
+    // convert_temperature uses its own (empty) description and also hits missing
+    const missingForGet = warnings.filter(
+      (w) =>
+        w.toolName === "get_weather" && w.kind === "missing-tool-description",
+    );
+    const missingForConvert = warnings.filter(
+      (w) =>
+        w.toolName === "convert_temperature" &&
+        w.kind === "missing-tool-description",
+    );
+    expect(missingForGet).toHaveLength(1);
+    expect(missingForConvert).toHaveLength(1);
+  });
+
+  it("uses draft.parameters for the tool being edited", () => {
+    const tools = [
+      makeTool(
+        "get_weather",
+        "A perfectly fine long description for the tool here.",
+        {
+          city: { description: "A perfectly fine city parameter description." },
+        },
+      ),
+    ];
+    const draft = {
+      toolName: "get_weather",
+      description: "A perfectly fine long description for the tool here.",
+      parameters: { city: "" },
+    };
+    const warnings = computeWarnings(tools, null, draft);
+    const missing = warnings.filter(
+      (w) => w.kind === "missing-param-description",
+    );
+    expect(missing).toHaveLength(1);
+    expect(missing[0].paramName).toBe("city");
+  });
+});
+
+describe("computeWarnings — fixture integration", () => {
+  it("produces correct warning set for a mixed-quality server", () => {
+    const tools = [
+      // Clean
+      makeTool(
+        "get_weather",
+        "Get current weather and a 5-day forecast for a given city. Use when asked.",
+        {
+          city: { description: "City name such as 'Minneapolis'." },
+        },
+      ),
+      // Short tool desc
+      makeTool("add", "adds two numbers", {
+        a: { description: "First operand value as a number." },
+        b: { description: "Second operand value as a number." },
+      }),
+      // Missing param desc
+      makeTool(
+        "convert_temperature",
+        "Convert a temperature between Celsius and Fahrenheit units.",
+        {
+          value: { description: "The numeric temperature value to convert." },
+          from: { description: "" },
+          to: { description: "The target unit symbol, C or F." },
+        },
+      ),
+    ];
+
+    const warnings = computeWarnings(tools, null);
+    const kinds = warnings.map(
+      (w) => `${w.toolName}:${w.paramName ?? "-"}:${w.kind}`,
+    );
+
+    // Clean tool: no warnings
+    expect(kinds.filter((k) => k.startsWith("get_weather:"))).toEqual([]);
+
+    // add: short-tool-description (only)
+    expect(kinds).toContain("add:-:short-tool-description");
+
+    // convert_temperature 'from' param: missing
+    expect(kinds).toContain(
+      "convert_temperature:from:missing-param-description",
+    );
+    // convert_temperature 'value' and 'to': no warnings
+    expect(
+      kinds.filter((k) => k.startsWith("convert_temperature:value:")),
+    ).toEqual([]);
+    expect(
+      kinds.filter((k) => k.startsWith("convert_temperature:to:")),
+    ).toEqual([]);
+  });
+});
+
+describe("computeWarnings — exotic schema handling", () => {
+  it("skips param with boolean-true shorthand schema", () => {
+    const tool: Tool = {
+      name: "test",
+      description: "A perfectly fine long description for the tool here.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          weird: true, // boolean shorthand
+        },
+      },
+    } as unknown as Tool;
+
+    const warnings = computeWarnings([tool], null);
+    // Should not emit any param warnings for 'weird'
+    expect(warnings.filter((w) => w.paramName === "weird")).toEqual([]);
+  });
+
+  it("handles tools with no inputSchema.properties", () => {
+    const tool: Tool = {
+      name: "no_params",
+      description: "A tool that takes no parameters at all, just runs once.",
+      inputSchema: {
+        type: "object",
+      },
+    } as Tool;
+    expect(() => computeWarnings([tool], null)).not.toThrow();
+    expect(computeWarnings([tool], null)).toEqual([]);
   });
 });
