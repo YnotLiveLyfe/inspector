@@ -1,4 +1,5 @@
 [tool.uv.workspace]
 members = [
     "packages-py/mcp-editor-metadata",
+    "examples/weather-server-py",
 ]
