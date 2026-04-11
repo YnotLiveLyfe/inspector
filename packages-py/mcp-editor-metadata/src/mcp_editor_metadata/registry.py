@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from .schema import MetadataFile
 
@@ -29,6 +30,40 @@ class ApplyResult:
     updated: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     missing: list[str] = field(default_factory=list)
+
+
+def patch_parameters_json_schema(
+    parameters_schema: dict[str, Any],
+    parameter_descriptions: dict[str, str] | None,
+) -> dict[str, Any]:
+    """
+    Return a NEW JSON Schema dict with parameter description fields patched.
+
+    Policy:
+      - Always returns a deep copy; never mutates the input.
+      - If parameter_descriptions is None or empty, returns the deep copy
+        unchanged (predictable: callers can trust the return value is
+        independent of the input in all cases).
+      - Only patches parameters whose name exists in BOTH `parameter_descriptions`
+        AND `parameters_schema['properties']`. Unknown names are silently
+        ignored (the `missing` warning is raised at the apply_metadata level).
+      - A schema with no `properties` key (parameterless tool) is returned
+        unchanged after deep copy.
+
+    The return value is safe to assign directly to a FastMCP FunctionTool's
+    `.parameters` attribute — FastMCP stores parameters as a JSON Schema dict
+    and reads it live on every `tools/list`.
+    """
+    result = copy.deepcopy(parameters_schema)
+    if not parameter_descriptions:
+        return result
+    properties = result.get("properties")
+    if not isinstance(properties, dict):
+        return result
+    for param_name, new_description in parameter_descriptions.items():
+        if param_name in properties and isinstance(properties[param_name], dict):
+            properties[param_name]["description"] = new_description
+    return result
 
 
 def apply_metadata(
