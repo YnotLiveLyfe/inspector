@@ -1,4 +1,5 @@
 import type { MetadataFile, ToolMetadata } from "./schema.js";
+import type { ZodRawShape, ZodTypeAny } from "zod";
 
 /**
  * A handle that looks like the TS SDK's RegisteredTool — enough surface
@@ -17,6 +18,38 @@ export interface ApplyResult {
   updated: string[]; // tools whose description changed and were updated
   skipped: string[]; // tools that already matched the metadata (no-op)
   missing: string[]; // metadata entries for tools we don't have handles for
+}
+
+/**
+ * Return a new ZodRawShape with parameter descriptions overridden.
+ *
+ * Policy:
+ *   - If descriptions is undefined OR empty, returns the ORIGINAL baseShape
+ *     object (reference equality) — no allocation, no rebuild.
+ *   - For each key in descriptions that also exists in baseShape, replaces
+ *     that key's Zod schema with `schema.describe(newDescription)`.
+ *   - Keys in descriptions that don't exist in baseShape are silently
+ *     ignored (the `missing` warning is emitted at the applyMetadata level).
+ *   - Keys in baseShape that aren't in descriptions are passed through
+ *     unchanged (preserving any existing source-code .describe() calls).
+ *
+ * The return value is safe to pass to `RegisteredTool.update({ paramsSchema })`.
+ */
+export function rebuildParamsSchema(
+  baseShape: ZodRawShape,
+  descriptions: Record<string, string> | undefined,
+): ZodRawShape {
+  if (!descriptions || Object.keys(descriptions).length === 0) {
+    return baseShape;
+  }
+  const rebuilt: ZodRawShape = {};
+  for (const [key, schema] of Object.entries(baseShape)) {
+    const newDesc = descriptions[key];
+    rebuilt[key] = newDesc
+      ? (schema as ZodTypeAny).describe(newDesc)
+      : schema;
+  }
+  return rebuilt;
 }
 
 /**
