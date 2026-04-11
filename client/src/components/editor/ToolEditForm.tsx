@@ -39,14 +39,12 @@ type SchemaProperties = Record<string, { description?: string }>;
  * still renders empty for those params (showing the source-doc placeholder).
  */
 function buildInitialParamDescriptions(
-  toolName: string,
-  _inputSchema: Tool["inputSchema"],
-  metadata: MetadataFile,
+  savedParameters: Record<string, { description?: string }> | undefined,
 ): Record<string, string> {
-  const existing = metadata.tools[toolName]?.parameters ?? {};
+  if (!savedParameters) return {};
   const result: Record<string, string> = {};
-  for (const paramName of Object.keys(existing)) {
-    const desc = existing[paramName]?.description;
+  for (const paramName of Object.keys(savedParameters)) {
+    const desc = savedParameters[paramName]?.description;
     if (typeof desc === "string") {
       result[paramName] = desc;
     }
@@ -69,7 +67,7 @@ export function ToolEditForm({
   const [paramDescriptions, setParamDescriptions] = useState<
     Record<string, string>
   >(() =>
-    buildInitialParamDescriptions(toolName, toolInputSchema, currentMetadata),
+    buildInitialParamDescriptions(currentMetadata.tools[toolName]?.parameters),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
