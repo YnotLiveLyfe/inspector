@@ -3,9 +3,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import {
   loadMetadata,
   registerReloadTool,
+  rebuildParamsSchema,
   type ToolHandle,
 } from "@mcp-editor/metadata";
-import { z } from "zod";
+import { z, type ZodRawShape } from "zod";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -20,17 +21,34 @@ async function main() {
     version: "0.1.0",
   });
 
-  // Keep handles keyed by tool name so the admin reload tool can update them.
-  // The Map is explicitly typed so applyMetadata()'s signature checks cleanly.
+  // Map of tool name → RegisteredTool handle for live updates.
   const handles = new Map<string, ToolHandle>();
 
+  // Map of tool name → the ORIGINAL ZodRawShape, no .describe() calls.
+  // This is the "base" from which paramsSchema is rebuilt on reload with
+  // parameter descriptions pulled from metadata.json. Keeping it free of
+  // baked-in .describe() text means metadata.json is the single source of
+  // truth for parameter documentation.
+  const baseShapes = new Map<string, ZodRawShape>();
+
+  // --- get_weather ---
+  const getWeatherBaseShape: ZodRawShape = {
+    city: z.string(),
+  };
+  baseShapes.set("get_weather", getWeatherBaseShape);
   handles.set(
     "get_weather",
     server.registerTool(
       "get_weather",
       {
         description: metadata.tools.get_weather.description,
-        inputSchema: { city: z.string().describe("City name") },
+        // On startup we apply any parameter descriptions from metadata.json
+        // to the base shape. If metadata has no parameters block, the shape
+        // passes through unchanged.
+        inputSchema: rebuildParamsSchema(
+          getWeatherBaseShape,
+          toDescriptionMap(metadata.tools.get_weather.parameters),
+        ),
       },
       async ({ city }) => ({
         content: [
@@ -40,17 +58,23 @@ async function main() {
     ),
   );
 
+  // --- convert_temperature ---
+  const convertBaseShape: ZodRawShape = {
+    value: z.number(),
+    from: z.enum(["C", "F"]),
+    to: z.enum(["C", "F"]),
+  };
+  baseShapes.set("convert_temperature", convertBaseShape);
   handles.set(
     "convert_temperature",
     server.registerTool(
       "convert_temperature",
       {
         description: metadata.tools.convert_temperature.description,
-        inputSchema: {
-          value: z.number().describe("Temperature value"),
-          from: z.enum(["C", "F"]).describe("Source unit"),
-          to: z.enum(["C", "F"]).describe("Target unit"),
-        },
+        inputSchema: rebuildParamsSchema(
+          convertBaseShape,
+          toDescriptionMap(metadata.tools.convert_temperature.parameters),
+        ),
       },
       async ({ value, from, to }) => {
         if (from === to)
@@ -64,11 +88,9 @@ async function main() {
     ),
   );
 
-  // Register the admin reload tool. The MCP Editor calls this tool (via the
-  // normal MCP client connection) after writing metadata.json. The tool
-  // re-reads the file from disk and calls handle.update() on each tool whose
-  // description or title changed.
-  registerReloadTool(server, METADATA_PATH, handles, {
+  // Register the admin reload tool. Passes BOTH handles and baseShapes so
+  // param description reloads work end-to-end.
+  registerReloadTool(server, METADATA_PATH, handles, baseShapes, {
     onReload: (result) => {
       if (result.updated.length > 0) {
         console.error(
@@ -86,6 +108,21 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("[weather-server] running on stdio");
+}
+
+/**
+ * Convert the optional parameters block from metadata.json into the flat
+ * `{ paramName: description }` map that rebuildParamsSchema wants.
+ */
+function toDescriptionMap(
+  parameters: Record<string, { description: string }> | undefined,
+): Record<string, string> | undefined {
+  if (!parameters) return undefined;
+  const out: Record<string, string> = {};
+  for (const [name, meta] of Object.entries(parameters)) {
+    out[name] = meta.description;
+  }
+  return out;
 }
 
 main().catch((err) => {

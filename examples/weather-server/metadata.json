@@ -2,10 +2,26 @@
   "version": 1,
   "tools": {
     "get_weather": {
-      "description": "Get the current weather for a city. Use this when the user asks about weather conditions, temperature, or forecasts."
+      "description": "Get the current weather for a city. Use this when the user asks about weather conditions, temperature, or forecasts.",
+      "parameters": {
+        "city": {
+          "description": "City name, e.g. 'Minneapolis' or 'London'. Prefer well-known city names over ambiguous ones."
+        }
+      }
     },
     "convert_temperature": {
-      "description": "Convert a temperature between Celsius and Fahrenheit. Use when the user asks to convert between units."
+      "description": "Convert a temperature between Celsius and Fahrenheit. Use when the user asks to convert between units.",
+      "parameters": {
+        "value": {
+          "description": "The numeric temperature value to convert."
+        },
+        "from": {
+          "description": "The source unit — 'C' for Celsius or 'F' for Fahrenheit."
+        },
+        "to": {
+          "description": "The target unit — 'C' for Celsius or 'F' for Fahrenheit."
+        }
+      }
     }
   }
 }

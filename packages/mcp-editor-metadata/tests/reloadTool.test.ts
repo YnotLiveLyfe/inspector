@@ -57,7 +57,7 @@ describe("registerReloadTool", () => {
     const server = makeServerShim();
     const handles = new Map<string, ToolHandle>([["echo", makeHandle("original")]]);
 
-    registerReloadTool(server as any, metaPath, handles);
+    registerReloadTool(server as any, metaPath, handles, new Map());
 
     expect(server.registerTool).toHaveBeenCalled();
     expect(server.registered[0].name).toBe("_reload_metadata");
@@ -68,7 +68,7 @@ describe("registerReloadTool", () => {
     const echo = makeHandle("original");
     const handles = new Map<string, ToolHandle>([["echo", echo]]);
 
-    registerReloadTool(server as any, metaPath, handles);
+    registerReloadTool(server as any, metaPath, handles, new Map());
 
     // Change the file, then invoke the handler
     writeMeta(metaPath, { echo: "UPDATED" });
@@ -87,7 +87,7 @@ describe("registerReloadTool", () => {
     const server = makeServerShim();
     const handles = new Map<string, ToolHandle>([["echo", makeHandle("original")]]);
 
-    registerReloadTool(server as any, metaPath, handles);
+    registerReloadTool(server as any, metaPath, handles, new Map());
 
     writeFileSync(metaPath, "{ not json");
     const result = (await server.registered[0].handler()) as any;
