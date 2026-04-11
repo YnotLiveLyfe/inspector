@@ -15,6 +15,7 @@ from fastmcp.tools.function_tool import FunctionTool
 from mcp_editor_metadata import (
     ApplyResult,
     ToolHandle,
+    apply_metadata,
     load_metadata,
     register_reload_tool,
 )
@@ -88,6 +89,19 @@ def build_server() -> FastMCP:
         "get_weather": get_weather_handle,
         "convert_temperature": convert_handle,
     }
+
+    # Apply metadata at startup so the first tools/list already reflects any
+    # parameter descriptions from metadata.json. Without this call, a fresh
+    # Python process shows FastMCP's auto-generated parameter schemas (no
+    # descriptions) until the Inspector triggers a reload, which would break
+    # the "reconnect shows persisted edits" durability test.
+    startup_result = apply_metadata(handles, initial)
+    if startup_result.missing:
+        sys.stderr.write(
+            f"[weather-server-py] WARN metadata references unknown tools: "
+            f"{', '.join(startup_result.missing)}\n"
+        )
+        sys.stderr.flush()
 
     def _log_reload(result: ApplyResult) -> None:
         # stderr-only: stdout is the JSON-RPC transport under stdio mode.
