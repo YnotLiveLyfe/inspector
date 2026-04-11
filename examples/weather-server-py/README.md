@@ -16,6 +16,16 @@ The server speaks MCP over stdio. Point Inspector at:
 - Arguments: `run weather-server-py`
 - Working directory: the fork root (`build/`)
 
+### Windows App Control workaround
+
+On Windows machines with Application Control policies enabled, the
+uv-generated `weather-server-py.exe` console script may be blocked with
+"OS error 4551". Use the equivalent `python -m` invocation instead:
+
+    uv run python -m weather_server_py.server
+
+Inspector equivalent: Arguments = `run python -m weather_server_py.server`.
+
 ## Edit a description
 
 1. Connect Inspector to this server.
