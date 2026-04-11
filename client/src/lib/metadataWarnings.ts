@@ -237,3 +237,73 @@ export function checkToolDescription(
 
   return warnings;
 }
+
+// -----------------------------------------------------------------------------
+// Parameter-level heuristic
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply parameter-level heuristics to a single param's effective description.
+ * Same precedence rules as checkToolDescription.
+ */
+export function checkParamDescription(
+  toolName: string,
+  paramName: string,
+  effectiveDesc: string,
+): Warning[] {
+  const trimmed = effectiveDesc.trim();
+
+  if (trimmed.length === 0) {
+    return [
+      {
+        toolName,
+        paramName,
+        kind: "missing-param-description",
+        severity: "error",
+        message: `Parameter '${paramName}' has no description. Add one in metadata.json.`,
+      },
+    ];
+  }
+
+  if (trimmed.length < SHORT_PARAM_DESC_CHARS) {
+    return [
+      {
+        toolName,
+        paramName,
+        kind: "short-param-description",
+        severity: "advisory",
+        message: `Parameter '${paramName}' description is very short (${trimmed.length} chars).`,
+      },
+    ];
+  }
+
+  const warnings: Warning[] = [];
+
+  const normalizedDesc = normalize(effectiveDesc);
+  const humanizedName = humanize(paramName);
+  if (
+    normalizedDesc === humanizedName ||
+    normalizedDesc === `the ${humanizedName}`
+  ) {
+    warnings.push({
+      toolName,
+      paramName,
+      kind: "echoes-param-name",
+      severity: "advisory",
+      message: `Parameter '${paramName}' description just repeats the name. Explain the value's purpose.`,
+    });
+  }
+
+  const tokens = tokenize(effectiveDesc);
+  if (tokens.length >= 2 && tokens.every((t) => ALL_STOPWORDS.has(t))) {
+    warnings.push({
+      toolName,
+      paramName,
+      kind: "stopwords-param-description",
+      severity: "advisory",
+      message: `Parameter '${paramName}' description uses only generic words.`,
+    });
+  }
+
+  return warnings;
+}

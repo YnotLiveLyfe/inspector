@@ -4,6 +4,7 @@ import {
   humanize,
   tokenize,
   checkToolDescription,
+  checkParamDescription,
   ALL_STOPWORDS,
   SHORT_TOOL_DESC_CHARS,
   SHORT_PARAM_DESC_CHARS,
@@ -232,5 +233,123 @@ describe("checkToolDescription — co-firing", () => {
     expect(kinds).toContain("stopwords-tool-description");
     expect(kinds).not.toContain("missing-tool-description");
     expect(kinds).not.toContain("short-tool-description");
+  });
+});
+
+describe("checkParamDescription — missing", () => {
+  it("emits missing-param-description for empty string", () => {
+    const warnings = checkParamDescription("get_weather", "city", "");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      toolName: "get_weather",
+      paramName: "city",
+      kind: "missing-param-description",
+      severity: "error",
+    });
+  });
+
+  it("emits missing-param-description for whitespace-only", () => {
+    const warnings = checkParamDescription("get_weather", "city", "   ");
+    expect(warnings[0].kind).toBe("missing-param-description");
+  });
+
+  it("suppresses other kinds when missing fires", () => {
+    const warnings = checkParamDescription("get_weather", "city", "");
+    expect(warnings.map((w) => w.kind)).toEqual(["missing-param-description"]);
+  });
+});
+
+describe("checkParamDescription — short", () => {
+  it("emits short-param-description for a 14-char description", () => {
+    const desc = "A".repeat(14);
+    const warnings = checkParamDescription("get_weather", "city", desc);
+    expect(warnings.map((w) => w.kind)).toEqual(["short-param-description"]);
+    expect(warnings[0].severity).toBe("advisory");
+    expect(warnings[0].message).toContain("14 chars");
+  });
+
+  it("does NOT emit short for a 15-char description (boundary)", () => {
+    const desc = "A".repeat(15);
+    const warnings = checkParamDescription("get_weather", "city", desc);
+    expect(warnings.map((w) => w.kind)).not.toContain(
+      "short-param-description",
+    );
+  });
+
+  it("suppresses echoes and stopwords if short fires", () => {
+    // "city" echoes the param name and is also short
+    const warnings = checkParamDescription("get_weather", "city", "city");
+    expect(warnings.map((w) => w.kind)).toEqual(["short-param-description"]);
+  });
+});
+
+describe("checkParamDescription — echoes-param-name", () => {
+  it("emits echoes when desc equals param name (padded long enough)", () => {
+    // We need a param name whose humanized form is >= 15 chars to clear short
+    const warnings = checkParamDescription(
+      "get_weather",
+      "the_city_to_look_up",
+      "the city to look up",
+    );
+    expect(warnings.map((w) => w.kind)).toContain("echoes-param-name");
+  });
+
+  it("emits echoes when desc is 'the ' + param name", () => {
+    const warnings = checkParamDescription(
+      "get_weather",
+      "city_identifier",
+      "the city identifier",
+    );
+    expect(warnings.map((w) => w.kind)).toContain("echoes-param-name");
+  });
+
+  it("does not emit echoes for distinct description", () => {
+    const warnings = checkParamDescription(
+      "get_weather",
+      "city",
+      "City name — e.g. 'Minneapolis' or 'Tokyo'",
+    );
+    expect(warnings.map((w) => w.kind)).not.toContain("echoes-param-name");
+  });
+});
+
+describe("checkParamDescription — stopwords", () => {
+  it("emits stopwords-param-description when all tokens are stopwords and length is sufficient", () => {
+    const warnings = checkParamDescription(
+      "get_weather",
+      "input",
+      "the input value to process",
+    );
+    expect(warnings.map((w) => w.kind)).toContain(
+      "stopwords-param-description",
+    );
+  });
+
+  it("does not emit stopwords when at least one token is domain-specific", () => {
+    const warnings = checkParamDescription(
+      "get_weather",
+      "city",
+      "the city name like Minneapolis",
+    );
+    expect(warnings.map((w) => w.kind)).not.toContain(
+      "stopwords-param-description",
+    );
+  });
+});
+
+describe("checkParamDescription — co-firing", () => {
+  it("emits both echoes and stopwords if both apply", () => {
+    // Param: "the_input_value" → humanize "the input value" (15 chars — at the boundary, doesn't fire short)
+    // Description: "the input value" → matches humanize AND all tokens are stopwords
+    const warnings = checkParamDescription(
+      "example",
+      "the_input_value",
+      "the input value",
+    );
+    const kinds = warnings.map((w) => w.kind);
+    expect(kinds).toContain("echoes-param-name");
+    expect(kinds).toContain("stopwords-param-description");
+    expect(kinds).not.toContain("missing-param-description");
+    expect(kinds).not.toContain("short-param-description");
   });
 });
