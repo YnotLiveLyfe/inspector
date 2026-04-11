@@ -167,3 +167,73 @@ export function tokenize(s: string): string[] {
   if (normalized.length === 0) return [];
   return normalized.split(" ").filter((t) => t.length > 0);
 }
+
+// -----------------------------------------------------------------------------
+// Tool-level heuristic
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply tool-level heuristics to a single tool's effective description and
+ * return zero or more Warning objects.
+ *
+ * Precedence:
+ * 1. Missing suppresses all others
+ * 2. Short suppresses echoes and stopwords
+ * 3. Otherwise echoes and stopwords test independently and may co-fire
+ */
+export function checkToolDescription(
+  toolName: string,
+  effectiveDesc: string,
+): Warning[] {
+  const trimmed = effectiveDesc.trim();
+
+  // Missing: highest priority, suppresses everything else
+  if (trimmed.length === 0) {
+    return [
+      {
+        toolName,
+        kind: "missing-tool-description",
+        severity: "error",
+        message: "Tool has no description. The AI can't decide when to use it.",
+      },
+    ];
+  }
+
+  // Short: suppresses echoes and stopwords
+  if (trimmed.length < SHORT_TOOL_DESC_CHARS) {
+    return [
+      {
+        toolName,
+        kind: "short-tool-description",
+        severity: "advisory",
+        message: `Tool description is very short (${trimmed.length} chars). Add context about when to use it.`,
+      },
+    ];
+  }
+
+  // Echoes and stopwords may co-fire
+  const warnings: Warning[] = [];
+
+  if (normalize(effectiveDesc) === humanize(toolName)) {
+    warnings.push({
+      toolName,
+      kind: "echoes-tool-name",
+      severity: "advisory",
+      message:
+        "Tool description just repeats the tool name. Add what it does beyond the name.",
+    });
+  }
+
+  const tokens = tokenize(effectiveDesc);
+  if (tokens.length >= 2 && tokens.every((t) => ALL_STOPWORDS.has(t))) {
+    warnings.push({
+      toolName,
+      kind: "stopwords-tool-description",
+      severity: "advisory",
+      message:
+        "Tool description uses only generic words. Add specific domain terms.",
+    });
+  }
+
+  return warnings;
+}

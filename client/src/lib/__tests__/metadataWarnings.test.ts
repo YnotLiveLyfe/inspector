@@ -3,6 +3,7 @@ import {
   normalize,
   humanize,
   tokenize,
+  checkToolDescription,
   ALL_STOPWORDS,
   SHORT_TOOL_DESC_CHARS,
   SHORT_PARAM_DESC_CHARS,
@@ -109,5 +110,127 @@ describe("exported types", () => {
       message: "test",
     };
     expect(w.kind).toBe("missing-tool-description");
+  });
+});
+
+describe("checkToolDescription — missing", () => {
+  it("emits missing-tool-description for empty string", () => {
+    const warnings = checkToolDescription("get_weather", "");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      toolName: "get_weather",
+      kind: "missing-tool-description",
+      severity: "error",
+    });
+  });
+
+  it("emits missing-tool-description for whitespace-only", () => {
+    const warnings = checkToolDescription("get_weather", "   \t\n ");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].kind).toBe("missing-tool-description");
+  });
+
+  it("does not emit other kinds when missing fires", () => {
+    const warnings = checkToolDescription("get_weather", "");
+    expect(warnings.map((w) => w.kind)).toEqual(["missing-tool-description"]);
+  });
+});
+
+describe("checkToolDescription — short", () => {
+  it("emits short-tool-description for a 29-char description", () => {
+    const desc = "A".repeat(29);
+    const warnings = checkToolDescription("get_weather", desc);
+    expect(warnings.map((w) => w.kind)).toEqual(["short-tool-description"]);
+    expect(warnings[0].severity).toBe("advisory");
+    expect(warnings[0].message).toContain("29 chars");
+  });
+
+  it("does NOT emit short for a 30-char description (boundary)", () => {
+    const desc = "A".repeat(30);
+    const warnings = checkToolDescription("get_weather", desc);
+    expect(warnings.map((w) => w.kind)).not.toContain("short-tool-description");
+  });
+
+  it("does not emit short when also missing", () => {
+    const warnings = checkToolDescription("get_weather", "");
+    expect(warnings.map((w) => w.kind)).not.toContain("short-tool-description");
+  });
+
+  it("suppresses echoes and stopwords even if triggered", () => {
+    // "Get weather" (11 chars) echoes the tool name AND is short
+    const warnings = checkToolDescription("get_weather", "Get weather");
+    expect(warnings.map((w) => w.kind)).toEqual(["short-tool-description"]);
+  });
+});
+
+describe("checkToolDescription — echoes-tool-name", () => {
+  it("emits echoes-tool-name when desc equals humanized name (padded to long enough)", () => {
+    // Use a tool name whose humanized form is already >= 30 chars.
+    const warnings = checkToolDescription(
+      "get_full_weather_forecast_for_a_city",
+      "Get full weather forecast for a city",
+    );
+    expect(warnings.map((w) => w.kind)).toContain("echoes-tool-name");
+  });
+
+  it("does not emit echoes when the description differs", () => {
+    const warnings = checkToolDescription(
+      "get_weather",
+      "Returns current weather conditions and a 5-day forecast for the given city.",
+    );
+    expect(warnings.map((w) => w.kind)).not.toContain("echoes-tool-name");
+  });
+
+  it("normalizes punctuation and case when comparing", () => {
+    const warnings = checkToolDescription(
+      "get_full_weather_forecast_for_a_city",
+      "GET FULL WEATHER FORECAST FOR A CITY!!!",
+    );
+    expect(warnings.map((w) => w.kind)).toContain("echoes-tool-name");
+  });
+});
+
+describe("checkToolDescription — stopwords", () => {
+  it("emits stopwords-tool-description when all tokens are stopwords and length is long enough", () => {
+    // "get the data and process the input values" — 41 chars, all stopwords
+    const warnings = checkToolDescription(
+      "example",
+      "get the data and process the input values",
+    );
+    expect(warnings.map((w) => w.kind)).toContain("stopwords-tool-description");
+  });
+
+  it("does not emit stopwords when at least one token is domain-specific", () => {
+    const warnings = checkToolDescription(
+      "example",
+      "get the weather data for the specified city location",
+    );
+    expect(warnings.map((w) => w.kind)).not.toContain(
+      "stopwords-tool-description",
+    );
+  });
+
+  it("requires at least 2 tokens (single-word handled by short)", () => {
+    // Single word "data" is already caught by short; stopwords should not also fire
+    const warnings = checkToolDescription("example", "data");
+    expect(warnings.map((w) => w.kind)).not.toContain(
+      "stopwords-tool-description",
+    );
+  });
+});
+
+describe("checkToolDescription — co-firing", () => {
+  it("emits both echoes and stopwords if both apply and length is sufficient", () => {
+    // Tool name "get_the_data_and_process_the_input" humanizes to "get the data and process the input" (34 chars)
+    // That matches the description — and all tokens are stopwords.
+    const warnings = checkToolDescription(
+      "get_the_data_and_process_the_input",
+      "Get the data and process the input",
+    );
+    const kinds = warnings.map((w) => w.kind);
+    expect(kinds).toContain("echoes-tool-name");
+    expect(kinds).toContain("stopwords-tool-description");
+    expect(kinds).not.toContain("missing-tool-description");
+    expect(kinds).not.toContain("short-tool-description");
   });
 });
