@@ -43,7 +43,7 @@ export function registerReloadTool(
     async () => {
       try {
         const metadata = await loadMetadata(metadataPath);
-        const result = applyMetadata(handles, metadata);
+        const result = applyMetadata(handles, new Map(), metadata);
         options.onReload?.(result);
 
         return {

@@ -5,7 +5,7 @@ import type { MetadataFile } from "../src/schema.js";
 function makeHandle(initialDescription: string) {
   const handle = {
     description: initialDescription,
-    update: vi.fn((updates: { description?: string; title?: string }) => {
+    update: vi.fn((updates: { description?: string; title?: string; paramsSchema?: unknown }) => {
       if (updates.description !== undefined) handle.description = updates.description;
     }),
   };
@@ -29,7 +29,7 @@ describe("applyMetadata", () => {
       },
     };
 
-    const result = applyMetadata(handles, metadata);
+    const result = applyMetadata(handles, new Map(), metadata);
 
     expect(echo.update).toHaveBeenCalledWith({ description: "new echo" });
     expect(add.update).not.toHaveBeenCalled();
@@ -45,7 +45,7 @@ describe("applyMetadata", () => {
       tools: { echo: { description: "desc", title: "Echo Tool" } },
     };
 
-    applyMetadata(handles, metadata);
+    applyMetadata(handles, new Map(), metadata);
 
     expect(echo.update).toHaveBeenCalledWith({
       description: "desc",
@@ -64,7 +64,7 @@ describe("applyMetadata", () => {
       },
     };
 
-    const result = applyMetadata(handles, metadata);
+    const result = applyMetadata(handles, new Map(), metadata);
 
     expect(result.missing).toEqual(["unknown"]);
     expect(echo.update).not.toHaveBeenCalled();
