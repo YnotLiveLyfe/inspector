@@ -7,6 +7,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
 
+from fastmcp import Context
+
 from .loader import load_metadata
 from .registry import ApplyResult, ToolHandle, apply_metadata
 
@@ -37,7 +39,12 @@ def register_reload_tool(
             "registered tools. Not intended for direct use by end users."
         ),
     )
-    async def _reload(ctx: Any) -> str:  # ctx: fastmcp.Context at runtime
+    async def _reload(ctx: Context) -> str:
+        # ctx MUST be annotated as fastmcp.Context (not Any) — FastMCP uses
+        # type-based parameter injection (find_kwarg_by_type) to auto-inject
+        # the Context at call time. With ctx: Any, FastMCP keeps ctx in the
+        # tool's Pydantic input schema as a required user argument and the
+        # MCP client call fails with "Missing required argument: ctx".
         try:
             metadata = load_metadata(path)
             result = apply_metadata(handles, metadata)
