@@ -23,15 +23,18 @@ describe("ParameterMetadataSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects unknown keys", () => {
+  it("rejects unknown keys (strict mode — matches Python extra='forbid')", () => {
     const result = ParameterMetadataSchema.safeParse({
       description: "ok",
       type: "string",
     });
-    // Note: Zod `object` is non-strict by default so extra keys pass. If we
-    // want strict, we'd use .strict(). For now we DON'T enforce strict —
-    // this test asserts the CURRENT behavior: extra keys pass silently.
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      // Zod's strict mode issues a 'unrecognized_keys' error
+      expect(
+        result.error.issues.some((i) => i.code === "unrecognized_keys"),
+      ).toBe(true);
+    }
   });
 });
 

@@ -4,10 +4,16 @@ import { z } from "zod";
  * Per-parameter metadata. Currently only holds a description override; future
  * phases may add name/type/required edits, but those require rebuild semantics
  * and are deferred.
+ *
+ * Strict: extra keys are rejected to match the Python equivalent's
+ * `ConfigDict(extra="forbid")`. A metadata.json with a typo like
+ * `{description: "ok", typ: "string"}` fails in both languages the same way.
  */
-export const ParameterMetadataSchema = z.object({
-  description: z.string().min(1, "Parameter description is required"),
-});
+export const ParameterMetadataSchema = z
+  .object({
+    description: z.string().min(1, "Parameter description is required"),
+  })
+  .strict();
 
 export type ParameterMetadata = z.infer<typeof ParameterMetadataSchema>;
 
