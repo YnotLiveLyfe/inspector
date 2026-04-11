@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -6,17 +6,20 @@ import {
   type MetadataFile,
   type ToolMetadata,
 } from "@/lib/metadataApi";
+import {
+  computeWarnings,
+  isBlockingInContext,
+  type Draft,
+} from "@/lib/metadataWarnings";
+import { WarningList } from "./WarningList";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 interface ToolEditFormProps {
-  toolName: string;
-  initialDescription: string;
   /**
-   * The tool's input schema, as surfaced by `listTools()`. Used ONLY to know
-   * which parameters exist so the form can render a textarea per parameter.
-   * The form never edits the schema itself — only parameter description text.
+   * The full Tool object as returned by `listTools()`. ToolEditForm derives
+   * `name`, `initialDescription`, and the parameter schema from this.
    */
-  toolInputSchema: Tool["inputSchema"];
+  tool: Tool;
   currentMetadata: MetadataFile;
   metadataPath: string;
   onSaved: () => void | Promise<void>;
@@ -28,37 +31,40 @@ type SchemaProperties = Record<string, { description?: string }>;
 /**
  * Build the initial per-parameter description map.
  *
- * Priority order for each param:
- *   1. metadata.json value (if present) — the user's previous override
- *   2. Empty string (placeholder will show the source-code description)
- *
- * The inputSchema's own `description` field is intentionally NOT used as the
- * seed because surfacing it would confuse users about what's being edited —
- * the placeholder text handles that cue instead.
+ * Only initializes entries where metadata already has an override. Params
+ * without a saved override are NOT added to the map — leaving them
+ * `undefined` lets Phase 2b's `computeWarnings` fall through to the server-
+ * effective description (from `listTools()`) instead of treating an empty
+ * string as a literal missing value. The textarea's `value={value ?? ""}`
+ * still renders empty for those params (showing the source-doc placeholder).
  */
 function buildInitialParamDescriptions(
   toolName: string,
-  inputSchema: Tool["inputSchema"],
+  _inputSchema: Tool["inputSchema"],
   metadata: MetadataFile,
 ): Record<string, string> {
-  const properties = (inputSchema?.properties as SchemaProperties) ?? {};
   const existing = metadata.tools[toolName]?.parameters ?? {};
   const result: Record<string, string> = {};
-  for (const paramName of Object.keys(properties)) {
-    result[paramName] = existing[paramName]?.description ?? "";
+  for (const paramName of Object.keys(existing)) {
+    const desc = existing[paramName]?.description;
+    if (typeof desc === "string") {
+      result[paramName] = desc;
+    }
   }
   return result;
 }
 
 export function ToolEditForm({
-  toolName,
-  initialDescription,
-  toolInputSchema,
+  tool,
   currentMetadata,
   metadataPath,
   onSaved,
   onCancel,
 }: ToolEditFormProps) {
+  const toolName = tool.name;
+  const initialDescription = tool.description ?? "";
+  const toolInputSchema = tool.inputSchema;
+
   const [description, setDescription] = useState(initialDescription);
   const [paramDescriptions, setParamDescriptions] = useState<
     Record<string, string>
@@ -70,6 +76,23 @@ export function ToolEditForm({
 
   const properties = (toolInputSchema?.properties as SchemaProperties) ?? {};
   const paramNames = Object.keys(properties);
+
+  // -- Phase 2b: live warnings derived from draft state ----------------------
+  const draftWarnings = useMemo(() => {
+    const draft: Draft = {
+      toolName,
+      description,
+      parameters: paramDescriptions,
+    };
+    return computeWarnings([tool], currentMetadata, draft);
+  }, [tool, currentMetadata, toolName, description, paramDescriptions]);
+
+  const blockingErrors = useMemo(
+    () => draftWarnings.filter((w) => isBlockingInContext(w, currentMetadata)),
+    [draftWarnings, currentMetadata],
+  );
+  const hasBlockingError = blockingErrors.length > 0;
+  // --------------------------------------------------------------------------
 
   const handleSave = async () => {
     setSaving(true);
@@ -125,6 +148,7 @@ export function ToolEditForm({
         </label>
         <Textarea
           id="tool-edit-description"
+          aria-label="Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={5}
@@ -174,17 +198,28 @@ export function ToolEditForm({
         </div>
       )}
 
+      <WarningList warnings={draftWarnings} />
+
       {error && <div className="text-sm text-destructive">{error}</div>}
-      <div className="flex gap-2">
-        <Button
-          onClick={handleSave}
-          disabled={saving || description.trim().length === 0}
-        >
-          {saving ? "Saving..." : "Save"}
-        </Button>
-        <Button variant="outline" onClick={onCancel} disabled={saving}>
-          Cancel
-        </Button>
+      <div className="flex flex-col gap-1">
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSave}
+            disabled={
+              saving || description.trim().length === 0 || hasBlockingError
+            }
+          >
+            {saving ? "Saving..." : "Save"}
+          </Button>
+          <Button variant="outline" onClick={onCancel} disabled={saving}>
+            Cancel
+          </Button>
+        </div>
+        {hasBlockingError && (
+          <div className="text-xs text-destructive">
+            Fix missing descriptions to save.
+          </div>
+        )}
       </div>
     </div>
   );

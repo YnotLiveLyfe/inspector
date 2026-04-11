@@ -382,9 +382,7 @@ const ToolsTab = ({
                 )}
                 {editingTool === selectedTool.name && currentMetadata ? (
                   <ToolEditForm
-                    toolName={selectedTool.name}
-                    initialDescription={selectedTool.description ?? ""}
-                    toolInputSchema={selectedTool.inputSchema}
+                    tool={selectedTool}
                     currentMetadata={currentMetadata}
                     metadataPath={metadataPath}
                     onSaved={async () => {
