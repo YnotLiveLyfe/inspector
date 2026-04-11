@@ -3,9 +3,14 @@
  * All requests go to the Inspector proxy server at the same origin.
  */
 
+export interface ParameterMetadata {
+  description: string;
+}
+
 export interface ToolMetadata {
   description: string;
   title?: string;
+  parameters?: Record<string, ParameterMetadata>;
 }
 
 export interface MetadataFile {
