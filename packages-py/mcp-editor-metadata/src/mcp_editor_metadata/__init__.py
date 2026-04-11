@@ -3,13 +3,14 @@
 from .loader import load_metadata
 from .registry import ApplyResult, ToolHandle, apply_metadata
 from .reload_tool import register_reload_tool
-from .schema import MetadataFile, ToolMetadata
+from .schema import MetadataFile, ParameterMetadata, ToolMetadata
 
 __version__ = "0.1.0"
 
 __all__ = [
     "__version__",
     "MetadataFile",
+    "ParameterMetadata",
     "ToolMetadata",
     "load_metadata",
     "ApplyResult",
