@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
-import { writeFile } from "fs/promises";
+import { rename, unlink, open } from "fs/promises";
+import { dirname, basename, join } from "path";
 import { loadMetadata, MetadataFileSchema } from "@mcp-editor/metadata";
 
 /**
@@ -53,14 +54,30 @@ export function registerMetadataRoutes(app: Express): void {
       return;
     }
 
+    const content = JSON.stringify(validation.data, null, 2) + "\n";
+    const dir = dirname(pathParam);
+    const base = basename(pathParam);
+    const tmpPath = join(dir, `.${base}.tmp.${process.pid}.${Date.now()}`);
+
     try {
-      await writeFile(
-        pathParam,
-        JSON.stringify(validation.data, null, 2) + "\n",
-        "utf-8",
-      );
+      // Write to temp file, fsync to disk, then atomic rename.
+      const handle = await open(tmpPath, "w");
+      try {
+        await handle.writeFile(content, "utf-8");
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+
+      await rename(tmpPath, pathParam);
       res.status(200).json({ ok: true });
     } catch (err) {
+      // Best-effort cleanup of the temp file.
+      try {
+        await unlink(tmpPath);
+      } catch {
+        // intentionally ignored
+      }
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });
     }

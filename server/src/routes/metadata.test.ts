@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import express from "express";
 import request from "supertest";
-import { writeFileSync, readFileSync, mkdtempSync, rmSync } from "fs";
+import {
+  writeFileSync,
+  readFileSync,
+  mkdtempSync,
+  rmSync,
+  readdirSync,
+} from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { registerMetadataRoutes } from "./metadata.js";
@@ -132,5 +138,73 @@ describe("PUT /api/metadata", () => {
     expect(res.body.error).toMatch(/metadata\.json/i);
     // The bad file must not have been modified
     expect(readFileSync(badPath, "utf-8")).toBe("original content");
+  });
+});
+
+describe("PUT /api/metadata — atomic writes (Phase 3)", () => {
+  let tmpDir: string;
+  let app: express.Express;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "mcp-editor-atomic-"));
+    app = express();
+    app.use(express.json());
+    registerMetadataRoutes(app);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("leaves no temp file behind after a successful write", async () => {
+    const path = join(tmpDir, "metadata.json");
+    writeFileSync(
+      path,
+      JSON.stringify({ version: 1, tools: { echo: { description: "old" } } }),
+    );
+
+    const res = await request(app)
+      .put("/api/metadata")
+      .query({ path })
+      .send({
+        version: 1,
+        tools: { echo: { description: "new" } },
+      });
+
+    expect(res.status).toBe(200);
+    const onDisk = JSON.parse(readFileSync(path, "utf-8"));
+    expect(onDisk.tools.echo.description).toBe("new");
+    const files = readdirSync(tmpDir);
+    expect(files).toEqual(["metadata.json"]);
+  });
+
+  it("leaves the original file intact when the write fails", async () => {
+    const path = join(tmpDir, "metadata.json");
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 1,
+        tools: { echo: { description: "original untouched" } },
+      }),
+    );
+
+    const dirPath = join(tmpDir, "metadata.json");
+    rmSync(dirPath, { force: true });
+    const { mkdirSync } = await import("fs");
+    mkdirSync(dirPath);
+
+    const res = await request(app)
+      .put("/api/metadata")
+      .query({ path: dirPath })
+      .send({
+        version: 1,
+        tools: { echo: { description: "new" } },
+      });
+
+    expect(res.status).toBe(500);
+    const { statSync } = await import("fs");
+    expect(statSync(dirPath).isDirectory()).toBe(true);
+    const files = readdirSync(tmpDir).filter((f) => f.startsWith("."));
+    expect(files).toEqual([]);
   });
 });
