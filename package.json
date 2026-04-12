@@ -26,7 +26,8 @@
     "client/dist",
     "server/build",
     "server/static",
-    "cli/build"
+    "cli/build",
+    "packages/mcp-editor-metadata"
   ],
   "workspaces": [
     "client",
@@ -62,6 +63,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@mcp-editor/metadata": "file:packages/mcp-editor-metadata",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "commander": "^13.1.0",
     "concurrently": "^9.2.0",
@@ -70,6 +72,7 @@
     "express-rate-limit": "^8.2.1",
     "node-fetch": "^3.3.2",
     "open": "^10.2.0",
+    "serve-handler": "^6.1.6",
     "shell-quote": "^1.8.3",
     "spawn-rx": "^5.1.2",
     "ts-node": "^10.9.2",
