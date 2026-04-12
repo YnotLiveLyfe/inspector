@@ -20,6 +20,8 @@ interface ToolEditFormProps {
    * `name`, `initialDescription`, and the parameter schema from this.
    */
   tool: Tool;
+  /** Auth token forwarded from the MCP proxy config. Undefined when auth is disabled. */
+  authToken?: string;
   currentMetadata: MetadataFile;
   metadataPath: string;
   onSaved: () => void | Promise<void>;
@@ -54,6 +56,7 @@ function buildInitialParamDescriptions(
 
 export function ToolEditForm({
   tool,
+  authToken,
   currentMetadata,
   metadataPath,
   onSaved,
@@ -129,7 +132,7 @@ export function ToolEditForm({
         },
       };
 
-      await saveMetadata(metadataPath, updated);
+      await saveMetadata(metadataPath, updated, authToken);
       await onSaved();
     } catch (err) {
       setError((err as Error).message);

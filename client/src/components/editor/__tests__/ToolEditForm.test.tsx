@@ -353,4 +353,26 @@ describe("ToolEditForm — Phase 2b warnings", () => {
       ),
     ).toBe(true);
   });
+
+  it("passes authToken through to saveMetadata when provided", async () => {
+    render(
+      <ToolEditForm
+        tool={baseTool}
+        authToken="test-token-xyz"
+        currentMetadata={baseMetadata}
+        metadataPath="/fake/metadata.json"
+        onSaved={jest.fn()}
+        onCancel={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => {
+      expect(mockedSave).toHaveBeenCalledTimes(1);
+    });
+
+    const tokenArg = mockedSave.mock.calls[0][2];
+    expect(tokenArg).toBe("test-token-xyz");
+  });
 });

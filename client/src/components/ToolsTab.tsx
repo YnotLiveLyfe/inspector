@@ -46,6 +46,8 @@ import IconDisplay, { WithIcons } from "./IconDisplay";
 import { cn } from "@/lib/utils";
 import { fetchMetadata, type MetadataFile } from "@/lib/metadataApi";
 import { severityTextClasses } from "@/lib/warningClasses";
+import { getMCPProxyAuthToken } from "@/utils/configUtils";
+import type { InspectorConfig } from "@/lib/configurationTypes";
 import { computeWarnings, type Warning } from "@/lib/metadataWarnings";
 import { ToolEditForm } from "@/components/editor/ToolEditForm";
 import { WarningBadge } from "@/components/editor/WarningBadge";
@@ -183,6 +185,7 @@ const ToolsTab = ({
   resourceContent,
   onReadResource,
   serverSupportsTaskRequests,
+  config,
 }: {
   tools: Tool[];
   listTools: () => void;
@@ -202,6 +205,7 @@ const ToolsTab = ({
   resourceContent: Record<string, string>;
   onReadResource?: (uri: string) => void;
   serverSupportsTaskRequests: boolean;
+  config: InspectorConfig;
 }) => {
   const [params, setParams] = useState<Record<string, unknown>>({});
   const [runAsTask, setRunAsTask] = useState(false);
@@ -219,6 +223,11 @@ const ToolsTab = ({
   const [editingTool, setEditingTool] = useState<string | null>(null);
   const [currentMetadata, setCurrentMetadata] = useState<MetadataFile | null>(
     null,
+  );
+
+  const authToken = useMemo(
+    () => getMCPProxyAuthToken(config).token || undefined,
+    [config],
   );
 
   // -- Phase 2b: sidebar-level warnings derived from tools + metadata --------
@@ -289,13 +298,13 @@ const ToolsTab = ({
       setCurrentMetadata(null);
       return;
     }
-    fetchMetadata(metadataPath)
+    fetchMetadata(metadataPath, authToken)
       .then(setCurrentMetadata)
       .catch((err) => {
         console.error("Failed to load metadata:", err);
         setCurrentMetadata(null);
       });
-  }, [metadataPath]);
+  }, [metadataPath, authToken]);
 
   // Keep selectedTool in sync with the tools array. When listTools() refreshes
   // the array after a metadata save, the Tool object references change — but
@@ -427,6 +436,7 @@ const ToolsTab = ({
                 {editingTool === selectedTool.name && currentMetadata ? (
                   <ToolEditForm
                     tool={selectedTool}
+                    authToken={authToken}
                     currentMetadata={currentMetadata}
                     metadataPath={metadataPath}
                     onSaved={async () => {
@@ -446,7 +456,10 @@ const ToolsTab = ({
                       await listTools();
                       // 3) Re-fetch the metadata file for the next edit session.
                       try {
-                        const refreshed = await fetchMetadata(metadataPath);
+                        const refreshed = await fetchMetadata(
+                          metadataPath,
+                          authToken,
+                        );
                         setCurrentMetadata(refreshed);
                       } catch (err) {
                         console.error(

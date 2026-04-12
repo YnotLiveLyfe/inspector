@@ -11,6 +11,7 @@ import {
   META_PREFIX_RULES_MESSAGE,
   RESERVED_NAMESPACE_MESSAGE,
 } from "../../utils/metaUtils";
+import type { InspectorConfig } from "../../lib/configurationTypes";
 
 describe("ToolsTab", () => {
   beforeEach(() => {
@@ -61,6 +62,45 @@ describe("ToolsTab", () => {
     },
   ];
 
+  const mockConfig: InspectorConfig = {
+    MCP_SERVER_REQUEST_TIMEOUT: {
+      label: "",
+      description: "",
+      value: 10000,
+      is_session_item: false,
+    },
+    MCP_REQUEST_TIMEOUT_RESET_ON_PROGRESS: {
+      label: "",
+      description: "",
+      value: false,
+      is_session_item: false,
+    },
+    MCP_REQUEST_MAX_TOTAL_TIMEOUT: {
+      label: "",
+      description: "",
+      value: 60000,
+      is_session_item: false,
+    },
+    MCP_PROXY_FULL_ADDRESS: {
+      label: "",
+      description: "",
+      value: "",
+      is_session_item: false,
+    },
+    MCP_PROXY_AUTH_TOKEN: {
+      label: "",
+      description: "",
+      value: "",
+      is_session_item: true,
+    },
+    MCP_TASK_TTL: {
+      label: "",
+      description: "",
+      value: 300000,
+      is_session_item: false,
+    },
+  };
+
   const defaultProps = {
     tools: mockTools,
     listTools: jest.fn(),
@@ -74,6 +114,7 @@ describe("ToolsTab", () => {
     resourceContent: {},
     onReadResource: jest.fn(),
     serverSupportsTaskRequests: true,
+    config: mockConfig,
   };
 
   const renderToolsTab = (props = {}) => {

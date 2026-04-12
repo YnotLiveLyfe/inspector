@@ -1583,6 +1583,7 @@ const App = () => {
                         clearError("resources");
                         readResource(uri);
                       }}
+                      config={config}
                     />
                     <TasksTab
                       tasks={tasks}
