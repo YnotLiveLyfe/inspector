@@ -45,6 +45,7 @@ import useCopy from "@/lib/hooks/useCopy";
 import IconDisplay, { WithIcons } from "./IconDisplay";
 import { cn } from "@/lib/utils";
 import { fetchMetadata, type MetadataFile } from "@/lib/metadataApi";
+import { severityTextClasses } from "@/lib/warningClasses";
 import { computeWarnings, type Warning } from "@/lib/metadataWarnings";
 import { ToolEditForm } from "@/components/editor/ToolEditForm";
 import { WarningBadge } from "@/components/editor/WarningBadge";
@@ -353,12 +354,12 @@ const ToolsTab = ({
         >
           <span className="font-medium">Description quality:</span>
           {totalErrorCount > 0 && (
-            <span className="text-red-600 dark:text-red-400">
+            <span className={severityTextClasses(true)}>
               ⚠ {totalErrorCount} error{totalErrorCount === 1 ? "" : "s"}
             </span>
           )}
           {totalAdvisoryCount > 0 && (
-            <span className="text-amber-600 dark:text-amber-400">
+            <span className={severityTextClasses(false)}>
               ⚠ {totalAdvisoryCount} suggestion
               {totalAdvisoryCount === 1 ? "" : "s"}
             </span>

@@ -1,4 +1,5 @@
 import type { Warning } from "@/lib/metadataWarnings";
+import { severityClasses } from "@/lib/warningClasses";
 import { cn } from "@/lib/utils";
 
 interface WarningListProps {
@@ -22,9 +23,7 @@ export function WarningList({ warnings }: WarningListProps) {
           key={`${w.toolName}:${w.paramName ?? ""}:${w.kind}:${idx}`}
           className={cn(
             "flex items-start gap-2 px-2 py-1 rounded border",
-            w.severity === "error"
-              ? "bg-red-50 text-red-700 border-red-300 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700"
-              : "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-700",
+            severityClasses(w.severity === "error"),
           )}
         >
           <span aria-hidden="true">⚠</span>
