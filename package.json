@@ -1,14 +1,25 @@
 {
-  "name": "@modelcontextprotocol/inspector",
-  "version": "0.21.1",
-  "description": "Model Context Protocol inspector",
-  "license": "SEE LICENSE IN LICENSE",
-  "author": "Model Context Protocol a Series of LF Projects, LLC.",
-  "homepage": "https://modelcontextprotocol.io",
-  "bugs": "https://github.com/modelcontextprotocol/inspector/issues",
+  "name": "mcp-editor",
+  "version": "0.1.0",
+  "description": "Visual GUI for editing MCP server tool descriptions, parameter descriptions, and metadata",
+  "license": "MIT",
+  "author": "Tony Sharon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YnotLiveLyfe/inspector.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "editor",
+    "inspector",
+    "tools"
+  ],
+  "homepage": "https://github.com/YnotLiveLyfe/inspector",
+  "bugs": "https://github.com/YnotLiveLyfe/inspector/issues",
   "type": "module",
   "bin": {
-    "mcp-inspector": "cli/build/cli.js"
+    "mcp-editor": "cli/build/cli.js"
   },
   "files": [
     "client/bin",
@@ -47,19 +58,22 @@
     "prepare": "husky && npm run build",
     "publish-all": "npm publish --workspaces --access public && npm publish --access public",
     "update-version": "node scripts/update-version.js",
-    "check-version": "node scripts/check-version-consistency.js"
+    "check-version": "node scripts/check-version-consistency.js",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/inspector-cli": "^0.21.1",
-    "@modelcontextprotocol/inspector-client": "^0.21.1",
-    "@modelcontextprotocol/inspector-server": "^0.21.1",
     "@modelcontextprotocol/sdk": "^1.25.2",
+    "commander": "^13.1.0",
     "concurrently": "^9.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "node-fetch": "^3.3.2",
     "open": "^10.2.0",
     "shell-quote": "^1.8.3",
     "spawn-rx": "^5.1.2",
     "ts-node": "^10.9.2",
+    "ws": "^8.18.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
