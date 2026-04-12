@@ -201,12 +201,7 @@ export function ToolEditForm({
       {error && <div className="text-sm text-destructive">{error}</div>}
       <div className="flex flex-col gap-1">
         <div className="flex gap-2">
-          <Button
-            onClick={handleSave}
-            disabled={
-              saving || description.trim().length === 0 || hasBlockingError
-            }
-          >
+          <Button onClick={handleSave} disabled={saving || hasBlockingError}>
             {saving ? "Saving..." : "Save"}
           </Button>
           <Button variant="outline" onClick={onCancel} disabled={saving}>
