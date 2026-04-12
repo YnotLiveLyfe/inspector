@@ -83,7 +83,7 @@ export function ToolEditForm({
       parameters: paramDescriptions,
     };
     return computeWarnings([tool], currentMetadata, draft);
-  }, [tool, currentMetadata, description, paramDescriptions]);
+  }, [tool, currentMetadata, toolName, description, paramDescriptions]);
 
   const blockingErrors = useMemo(
     () => draftWarnings.filter((w) => isBlockingInContext(w, currentMetadata)),
