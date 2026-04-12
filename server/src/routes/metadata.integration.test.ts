@@ -68,7 +68,7 @@ describe("PUT /api/metadata — middleware-wired (Phase 3 integration)", () => {
       .put("/api/metadata")
       .query({ path })
       .set("Origin", "http://localhost:6274")
-      .set("X-MCP-Proxy-Auth", "Bearer wrong-token-with-different-length")
+      .set("X-MCP-Proxy-Auth", "Bearer test-session-token-0123456789abcdff")
       .send({
         version: 1,
         tools: { echo: { description: "new" } },
