@@ -29,7 +29,11 @@ import rateLimit from "express-rate-limit";
 import { findActualExecutable } from "spawn-rx";
 import mcpProxy from "./mcpProxy.js";
 import { registerMetadataRoutes } from "./routes/metadata.js";
-import { randomUUID, randomBytes, timingSafeEqual } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
+import {
+  createOriginValidationMiddleware,
+  createAuthMiddleware,
+} from "./middleware/auth.js";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { readFileSync } from "fs";
@@ -194,80 +198,15 @@ const sessionToken =
 const authDisabled = !!process.env.DANGEROUSLY_OMIT_AUTH;
 
 // Origin validation middleware to prevent DNS rebinding attacks
-const originValidationMiddleware = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-) => {
-  const origin = req.headers.origin;
+const originValidationMiddleware = createOriginValidationMiddleware({
+  clientPort: process.env.CLIENT_PORT || "6274",
+  allowedOrigins: process.env.ALLOWED_ORIGINS?.split(","),
+});
 
-  // Default origins based on CLIENT_PORT or use environment variable
-  const clientPort = process.env.CLIENT_PORT || "6274";
-  const defaultOrigin = `http://localhost:${clientPort}`;
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [
-    defaultOrigin,
-  ];
-
-  if (origin && !allowedOrigins.includes(origin)) {
-    console.error(`Invalid origin: ${origin}`);
-    res.status(403).json({
-      error: "Forbidden - invalid origin",
-      message:
-        "Request blocked to prevent DNS rebinding attacks. Configure allowed origins via environment variable.",
-    });
-    return;
-  }
-  next();
-};
-
-const authMiddleware = (
-  req: express.Request,
-  res: express.Response,
-  next: express.NextFunction,
-) => {
-  if (authDisabled) {
-    return next();
-  }
-
-  const sendUnauthorized = () => {
-    res.status(401).json({
-      error: "Unauthorized",
-      message:
-        "Authentication required. Use the session token shown in the console when starting the server.",
-    });
-  };
-
-  const authHeader = req.headers["x-mcp-proxy-auth"];
-  const authHeaderValue = Array.isArray(authHeader)
-    ? authHeader[0]
-    : authHeader;
-
-  if (!authHeaderValue || !authHeaderValue.startsWith("Bearer ")) {
-    sendUnauthorized();
-    return;
-  }
-
-  const providedToken = authHeaderValue.substring(7); // Remove 'Bearer ' prefix
-  const expectedToken = sessionToken;
-
-  // Convert to buffers for timing-safe comparison
-  const providedBuffer = Buffer.from(providedToken);
-  const expectedBuffer = Buffer.from(expectedToken);
-
-  // Check length first to prevent timing attacks
-  if (providedBuffer.length !== expectedBuffer.length) {
-    sendUnauthorized();
-    return;
-  }
-
-  // Perform timing-safe comparison
-  if (!timingSafeEqual(providedBuffer, expectedBuffer)) {
-    sendUnauthorized();
-    return;
-  }
-
-  next();
-};
+const authMiddleware = createAuthMiddleware({
+  sessionToken,
+  authDisabled,
+});
 
 /**
  * Converts a Node.js ReadableStream to a web-compatible ReadableStream
