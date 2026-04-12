@@ -234,11 +234,11 @@ const ToolsTab = ({
     return by;
   }, [warnings]);
 
-  const totalErrorCount = useMemo(
-    () => warnings.filter((w) => w.severity === "error").length,
-    [warnings],
-  );
-  const totalAdvisoryCount = warnings.length - totalErrorCount;
+  const { errors: totalErrorCount, advisories: totalAdvisoryCount } =
+    useMemo(() => {
+      const errors = warnings.filter((w) => w.severity === "error").length;
+      return { errors, advisories: warnings.length - errors };
+    }, [warnings]);
   // --------------------------------------------------------------------------
 
   // Function to check if any form has validation errors
