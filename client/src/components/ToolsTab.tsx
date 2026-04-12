@@ -45,6 +45,7 @@ import useCopy from "@/lib/hooks/useCopy";
 import IconDisplay, { WithIcons } from "./IconDisplay";
 import { cn } from "@/lib/utils";
 import { fetchMetadata, type MetadataFile } from "@/lib/metadataApi";
+import { loadRecentPaths, addRecentPath } from "@/lib/recentMetadataPaths";
 import { severityTextClasses } from "@/lib/warningClasses";
 import { getMCPProxyAuthToken } from "@/utils/configUtils";
 import type { InspectorConfig } from "@/lib/configurationTypes";
@@ -221,6 +222,9 @@ const ToolsTab = ({
   const { toast } = useToast();
   const { copied, setCopied } = useCopy();
   const [metadataPath, setMetadataPath] = useState("");
+  const [recentPaths, setRecentPaths] = useState<string[]>(() =>
+    loadRecentPaths(),
+  );
   const [editingTool, setEditingTool] = useState<string | null>(null);
   const [currentMetadata, setCurrentMetadata] = useState<MetadataFile | null>(
     null,
@@ -300,7 +304,10 @@ const ToolsTab = ({
       return;
     }
     fetchMetadata(metadataPath, authToken)
-      .then(setCurrentMetadata)
+      .then((md) => {
+        setCurrentMetadata(md);
+        setRecentPaths(addRecentPath(metadataPath));
+      })
       .catch((err) => {
         console.error("Failed to load metadata:", err);
         setCurrentMetadata(null);
@@ -355,7 +362,13 @@ const ToolsTab = ({
           value={metadataPath}
           onChange={(e) => setMetadataPath(e.target.value)}
           placeholder="/abs/path/to/metadata.json"
+          list="recent-metadata-paths"
         />
+        <datalist id="recent-metadata-paths">
+          {recentPaths.map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
       </div>
       {warnings.length > 0 && (
         <div

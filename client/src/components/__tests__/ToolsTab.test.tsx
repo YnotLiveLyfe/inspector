@@ -1052,8 +1052,13 @@ describe("ToolsTab", () => {
         selectedTool: toolWithStringParam,
       });
 
-      // Should render textarea, not select
-      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+      // Should render textarea, not select (filter out the metadata-path input which has list= and thus combobox role)
+      const comboboxes = screen
+        .queryAllByRole("combobox")
+        .filter(
+          (el) => el.getAttribute("data-testid") !== "metadata-path-input",
+        );
+      expect(comboboxes).toHaveLength(0);
       const toolTextboxes = screen
         .getAllByRole("textbox")
         .filter(
