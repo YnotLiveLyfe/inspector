@@ -18,9 +18,26 @@ export interface MetadataFile {
   tools: Record<string, ToolMetadata>;
 }
 
-export async function fetchMetadata(path: string): Promise<MetadataFile> {
+function buildHeaders(
+  token: string | undefined,
+  extra: Record<string, string> = {},
+): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  if (token) {
+    headers["X-MCP-Proxy-Auth"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+export async function fetchMetadata(
+  path: string,
+  token?: string,
+): Promise<MetadataFile> {
   const url = `/api/metadata?path=${encodeURIComponent(path)}`;
-  const res = await fetch(url, { method: "GET" });
+  const res = await fetch(url, {
+    method: "GET",
+    headers: buildHeaders(token),
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error || `Request failed with ${res.status}`);
@@ -31,11 +48,12 @@ export async function fetchMetadata(path: string): Promise<MetadataFile> {
 export async function saveMetadata(
   path: string,
   data: MetadataFile,
+  token?: string,
 ): Promise<void> {
   const url = `/api/metadata?path=${encodeURIComponent(path)}`;
   const res = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(token, { "Content-Type": "application/json" }),
     body: JSON.stringify(data),
   });
   if (!res.ok) {

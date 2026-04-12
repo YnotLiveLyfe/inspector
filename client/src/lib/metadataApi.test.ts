@@ -55,4 +55,54 @@ describe("metadataApi", () => {
       }),
     );
   });
+
+  it("fetchMetadata sends X-MCP-Proxy-Auth header when token is provided", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ version: 1, tools: {} }),
+    });
+
+    await fetchMetadata("/path.json", "my-token-abc");
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(callArgs.headers["X-MCP-Proxy-Auth"]).toBe("Bearer my-token-abc");
+  });
+
+  it("fetchMetadata omits X-MCP-Proxy-Auth header when token is not provided", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ version: 1, tools: {} }),
+    });
+
+    await fetchMetadata("/path.json");
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(callArgs.headers).not.toHaveProperty("X-MCP-Proxy-Auth");
+  });
+
+  it("saveMetadata sends X-MCP-Proxy-Auth header when token is provided", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    await saveMetadata("/path.json", { version: 1, tools: {} }, "my-token-abc");
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(callArgs.headers["X-MCP-Proxy-Auth"]).toBe("Bearer my-token-abc");
+    expect(callArgs.headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("saveMetadata omits X-MCP-Proxy-Auth header when token is not provided", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    await saveMetadata("/path.json", { version: 1, tools: {} });
+
+    const callArgs = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(callArgs.headers["Content-Type"]).toBe("application/json");
+    expect(callArgs.headers).not.toHaveProperty("X-MCP-Proxy-Auth");
+  });
 });
