@@ -1,6 +1,7 @@
 {
   "name": "@modelcontextprotocol/inspector-client",
   "version": "0.21.1",
+  "private": true,
   "description": "Client-side application for the Model Context Protocol inspector",
   "license": "SEE LICENSE IN LICENSE",
   "author": "Model Context Protocol a Series of LF Projects, LLC.",
