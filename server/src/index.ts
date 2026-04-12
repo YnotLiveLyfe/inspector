@@ -760,7 +760,7 @@ app.get(
   },
 );
 
-registerMetadataRoutes(app);
+registerMetadataRoutes(app, [originValidationMiddleware, authMiddleware]);
 
 const PORT = parseInt(
   process.env.SERVER_PORT || DEFAULT_MCP_PROXY_LISTEN_PORT,
