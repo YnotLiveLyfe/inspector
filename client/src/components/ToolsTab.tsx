@@ -50,6 +50,7 @@ import { getMCPProxyAuthToken } from "@/utils/configUtils";
 import type { InspectorConfig } from "@/lib/configurationTypes";
 import { computeWarnings, type Warning } from "@/lib/metadataWarnings";
 import { ToolEditForm } from "@/components/editor/ToolEditForm";
+import { handleMetadataSaved } from "./handleMetadataSaved";
 import { WarningBadge } from "@/components/editor/WarningBadge";
 import {
   META_NAME_RULES_MESSAGE,
@@ -440,33 +441,16 @@ const ToolsTab = ({
                     currentMetadata={currentMetadata}
                     metadataPath={metadataPath}
                     onSaved={async () => {
-                      setEditingTool(null);
-                      // CRITICAL: reload must happen BEFORE listTools.
-                      // 1) Tell the running MCP server to re-read metadata.json from disk
-                      //    and call handle.update() on the tools whose descriptions changed.
-                      try {
-                        await callTool("_reload_metadata", {});
-                      } catch (err) {
-                        console.warn(
-                          "_reload_metadata failed — server may not support hot reload:",
-                          err,
-                        );
-                      }
-                      // 2) Re-fetch tools/list so the UI reflects the updated descriptions.
-                      await listTools();
-                      // 3) Re-fetch the metadata file for the next edit session.
-                      try {
-                        const refreshed = await fetchMetadata(
-                          metadataPath,
-                          authToken,
-                        );
-                        setCurrentMetadata(refreshed);
-                      } catch (err) {
-                        console.error(
-                          "Failed to refresh metadata after save:",
-                          err,
-                        );
-                      }
+                      await handleMetadataSaved({
+                        setEditingTool,
+                        callTool,
+                        listTools,
+                        fetchMetadataFn: fetchMetadata,
+                        setCurrentMetadata,
+                        toast,
+                        metadataPath,
+                        authToken,
+                      });
                     }}
                     onCancel={() => setEditingTool(null)}
                   />
